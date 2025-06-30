@@ -211,11 +211,22 @@ async function getDatabaseData(connection) {
               }
             }
             
-            // 处理普通字符串，转义单引号
-            return `'${value.replace(/'/g, "''")}'`;
+            // 处理普通字符串，转义单引号和其他特殊字符
+            return `'${value.replace(/'/g, "''").replace(/\\/g, "\\\\")}'`;
           }
           
-          return value;
+          // 处理数字类型
+          if (typeof value === 'number') {
+            return value.toString();
+          }
+          
+          // 处理布尔类型
+          if (typeof value === 'boolean') {
+            return value ? '1' : '0';
+          }
+          
+          // 处理其他类型，转换为字符串并转义
+          return `'${String(value).replace(/'/g, "''").replace(/\\/g, "\\\\")}'`;
         });
         return `(${rowValues.join(', ')})`;
       });
