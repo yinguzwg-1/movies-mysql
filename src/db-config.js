@@ -2,7 +2,7 @@
 const configs = {
   // 开发环境
   development: {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '223.4.248.176',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'qq123456',
     database: process.env.DB_NAME || 'nest_db',
@@ -12,7 +12,7 @@ const configs = {
   
   // 测试环境
   test: {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || '223.4.248.176',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'qq123456',
     database: process.env.DB_NAME || 'nest_db',
@@ -22,7 +22,7 @@ const configs = {
   
   // 预发布环境
   staging: {
-   host: process.env.DB_HOST || 'localhost',
+   host: process.env.DB_HOST || '223.4.248.176',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'qq123456',
     database: process.env.DB_NAME || 'nest_db',
@@ -32,7 +32,7 @@ const configs = {
   
   // 生产环境
   production: {
-   host: process.env.DB_HOST || 'localhost',
+   host: process.env.DB_HOST || '223.4.248.176',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'qq123456',
     database: process.env.DB_NAME || 'nest_db',
