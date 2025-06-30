@@ -42,6 +42,11 @@ jobs:
         script: |
           echo "🚀 开始部署数据库到阿里云服务器..."
           echo "📦 数据库文件: ${{ github.event.inputs.database_file || 'database.sql' }}"
+          echo "🔍 调试信息开始 ========================"
+          echo "数据库名称: '${{ secrets.DB_NAME }}'"
+          echo "数据库用户: '${{ secrets.DB_USER }}'"
+          echo "数据库密码长度: ${#DB_PASSWORD} 字符"
+          echo "=========================================="
           
           # 检查 MySQL 是否安装
           if ! command -v mysql &> /dev/null; then
@@ -55,6 +60,10 @@ jobs:
             sudo systemctl start mysql || true
           fi
           
+          # 检查 MySQL 服务状态
+          echo "🔍 MySQL 服务状态:"
+          sudo systemctl status mysql --no-pager -l
+          
           # 创建数据库用户（如果不存在）
           echo "🔧 配置数据库用户..."
           sudo mysql -e "CREATE USER IF NOT EXISTS '${{ secrets.DB_USER }}'@'localhost' IDENTIFIED BY '${{ secrets.DB_PASSWORD }}';" || true
@@ -64,6 +73,10 @@ jobs:
           # 创建数据库（如果不存在）
           echo "📊 创建数据库..."
           sudo mysql -e "CREATE DATABASE IF NOT EXISTS \`${{ secrets.DB_NAME }}\`;" || true
+          
+          # 显示所有数据库
+          echo "🔍 当前所有数据库:"
+          sudo mysql -e "SHOW DATABASES;"
           
           # 创建配置文件来避免密码在命令行中显示
           MYSQL_CNF="/tmp/mysql.cnf"
@@ -75,8 +88,23 @@ jobs:
           port=3306
           EOF
           
+          echo "🔍 配置文件内容（隐藏密码）:"
+          cat "$MYSQL_CNF" | sed 's/password=.*/password=***HIDDEN***/'
+          
           # 设置配置文件权限
           chmod 600 "$MYSQL_CNF"
+          
+          # 测试数据库连接
+          echo "🔍 测试数据库连接..."
+          if sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SELECT 1;" > /dev/null 2>&1; then
+            echo "✅ 数据库连接成功"
+          else
+            echo "❌ 数据库连接失败"
+            echo "🔍 尝试显示错误信息:"
+            sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SELECT 1;" 2>&1
+            rm -f "$MYSQL_CNF"
+            exit 1
+          fi
           
           # 备份现有数据库（如果存在）
           echo "📦 备份现有数据库..."
@@ -92,6 +120,7 @@ jobs:
           rm -f "$MYSQL_CNF"
           
           echo "✅ 数据库准备完成"
+          echo "🔍 调试信息结束 ========================"
 
     - name: 📤 上传数据库文件
       uses: appleboy/scp-action@v0.1.7
@@ -113,7 +142,22 @@ jobs:
         command_timeout: "600s"
         script: |
           echo "📥 导入数据库..."
+          echo "🔍 调试信息开始 ========================"
+          echo "数据库文件: /tmp/${{ github.event.inputs.database_file || 'database.sql' }}"
+          echo "数据库名称: '${{ secrets.DB_NAME }}'"
+          echo "数据库用户: '${{ secrets.DB_USER }}'"
+          echo "数据库密码长度: ${#DB_PASSWORD} 字符"
+          echo "=========================================="
+          
           DB_FILE="/tmp/${{ github.event.inputs.database_file || 'database.sql' }}"
+          
+          # 检查文件是否存在
+          if [ ! -f "$DB_FILE" ]; then
+            echo "❌ 数据库文件不存在: $DB_FILE"
+            exit 1
+          fi
+          
+          echo "✅ 数据库文件存在，大小: $(ls -lh "$DB_FILE" | awk '{print $5}')"
           
           # 创建配置文件来避免密码在命令行中显示
           MYSQL_CNF="/tmp/mysql.cnf"
@@ -125,16 +169,49 @@ jobs:
           port=3306
           EOF
           
+          echo "🔍 配置文件内容（隐藏密码）:"
+          cat "$MYSQL_CNF" | sed 's/password=.*/password=***HIDDEN***/'
+          
           # 设置配置文件权限
           chmod 600 "$MYSQL_CNF"
+          echo "✅ 配置文件权限设置完成"
+          
+          # 测试数据库连接
+          echo "🔍 测试数据库连接..."
+          if sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SELECT 1;" > /dev/null 2>&1; then
+            echo "✅ 数据库连接成功"
+          else
+            echo "❌ 数据库连接失败"
+            echo "🔍 尝试显示错误信息:"
+            sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SELECT 1;" 2>&1
+            rm -f "$MYSQL_CNF"
+            exit 1
+          fi
+          
+          # 检查数据库是否存在
+          echo "🔍 检查数据库是否存在..."
+          DB_EXISTS=$(sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SHOW DATABASES LIKE '${{ secrets.DB_NAME }}';" 2>/dev/null | wc -l)
+          if [ "$DB_EXISTS" -gt 1 ]; then
+            echo "✅ 数据库 '${{ secrets.DB_NAME }}' 已存在"
+          else
+            echo "⚠️ 数据库 '${{ secrets.DB_NAME }}' 不存在，将创建"
+            sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "CREATE DATABASE \`${{ secrets.DB_NAME }}\`;"
+          fi
+          
+          # 显示所有数据库
+          echo "🔍 当前所有数据库:"
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SHOW DATABASES;"
           
           # 使用配置文件导入数据库
+          echo "📥 开始导入数据库到 '${{ secrets.DB_NAME }}'..."
           sudo mysql --defaults-extra-file="$MYSQL_CNF" \`${{ secrets.DB_NAME }}\` < "$DB_FILE"
           
           if [ $? -eq 0 ]; then
             echo "✅ 数据库导入成功！"
           else
             echo "❌ 数据库导入失败"
+            echo "🔍 导入错误详情:"
+            sudo mysql --defaults-extra-file="$MYSQL_CNF" \`${{ secrets.DB_NAME }}\` < "$DB_FILE" 2>&1
             # 清理配置文件
             rm -f "$MYSQL_CNF"
             exit 1
@@ -145,12 +222,16 @@ jobs:
           TABLE_COUNT=$(sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`${{ secrets.DB_NAME }}\`; SHOW TABLES;" | wc -l)
           echo "📊 数据库表数量: $((TABLE_COUNT - 1))"
           
+          echo "🔍 数据库中的表:"
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`${{ secrets.DB_NAME }}\`; SHOW TABLES;"
+          
           # 清理临时文件
           rm -f "$DB_FILE" "$MYSQL_CNF"
           
           echo "🎉 数据库部署完成！"
           echo "🌐 数据库地址: ${{ secrets.ALIYUN_HOST }}:3306"
           echo "📊 数据库名称: ${{ secrets.DB_NAME }}"
+          echo "🔍 调试信息结束 ========================"
 
     - name: 🔄 重启应用
       uses: appleboy/ssh-action@v1.0.3
