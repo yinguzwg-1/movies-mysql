@@ -13,7 +13,6 @@ yarn-error.log*
 
 # 备份文件
 backups/
-*.sql
 *.zip
 *.gz
 
@@ -41,11 +40,6 @@ Thumbs.db
 *.key
 id_rsa
 id_rsa.pub
-
-# 数据库文件
-*.db
-*.sqlite
-*.sqlite3
 
 # 压缩文件
 *.tar
