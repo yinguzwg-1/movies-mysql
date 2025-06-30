@@ -65,15 +65,31 @@ jobs:
           echo "📊 创建数据库..."
           sudo mysql -e "CREATE DATABASE IF NOT EXISTS \`${{ secrets.DB_NAME }}\`;" || true
           
+          # 创建配置文件来避免密码在命令行中显示
+          MYSQL_CNF="/tmp/mysql.cnf"
+          cat > "$MYSQL_CNF" << EOF
+          [client]
+          user=${{ secrets.DB_USER }}
+          password=${{ secrets.DB_PASSWORD }}
+          host=localhost
+          port=3306
+          EOF
+          
+          # 设置配置文件权限
+          chmod 600 "$MYSQL_CNF"
+          
           # 备份现有数据库（如果存在）
           echo "📦 备份现有数据库..."
           BACKUP_FILE="/tmp/backup_${{ secrets.DB_NAME }}_$(date +%Y%m%d_%H%M%S).sql"
-          sudo mysqldump -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} \`${{ secrets.DB_NAME }}\` > "$BACKUP_FILE" 2>/dev/null || echo "⚠️ 备份失败或数据库为空"
+          sudo mysqldump --defaults-extra-file="$MYSQL_CNF" \`${{ secrets.DB_NAME }}\` > "$BACKUP_FILE" 2>/dev/null || echo "⚠️ 备份失败或数据库为空"
           
           # 删除现有数据库内容
           echo "🗑️ 清空现有数据库..."
-          sudo mysql -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} -e "DROP DATABASE IF EXISTS \`${{ secrets.DB_NAME }}\`;"
-          sudo mysql -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} -e "CREATE DATABASE \`${{ secrets.DB_NAME }}\`;"
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "DROP DATABASE IF EXISTS \`${{ secrets.DB_NAME }}\`;"
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "CREATE DATABASE \`${{ secrets.DB_NAME }}\`;"
+          
+          # 清理配置文件
+          rm -f "$MYSQL_CNF"
           
           echo "✅ 数据库准备完成"
 
@@ -99,23 +115,38 @@ jobs:
           echo "📥 导入数据库..."
           DB_FILE="/tmp/${{ github.event.inputs.database_file || 'database.sql' }}"
           
-          # 导入数据库
-          sudo mysql -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} \`${{ secrets.DB_NAME }}\` < "$DB_FILE"
+          # 创建配置文件来避免密码在命令行中显示
+          MYSQL_CNF="/tmp/mysql.cnf"
+          cat > "$MYSQL_CNF" << EOF
+          [client]
+          user=${{ secrets.DB_USER }}
+          password=${{ secrets.DB_PASSWORD }}
+          host=localhost
+          port=3306
+          EOF
+          
+          # 设置配置文件权限
+          chmod 600 "$MYSQL_CNF"
+          
+          # 使用配置文件导入数据库
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" \`${{ secrets.DB_NAME }}\` < "$DB_FILE"
           
           if [ $? -eq 0 ]; then
             echo "✅ 数据库导入成功！"
           else
             echo "❌ 数据库导入失败"
+            # 清理配置文件
+            rm -f "$MYSQL_CNF"
             exit 1
           fi
           
           # 验证导入结果
           echo "🔍 验证数据库..."
-          TABLE_COUNT=$(sudo mysql -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} -e "USE \`${{ secrets.DB_NAME }}\`; SHOW TABLES;" | wc -l)
+          TABLE_COUNT=$(sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`${{ secrets.DB_NAME }}\`; SHOW TABLES;" | wc -l)
           echo "📊 数据库表数量: $((TABLE_COUNT - 1))"
           
           # 清理临时文件
-          rm -f "$DB_FILE"
+          rm -f "$DB_FILE" "$MYSQL_CNF"
           
           echo "🎉 数据库部署完成！"
           echo "🌐 数据库地址: ${{ secrets.ALIYUN_HOST }}:3306"
