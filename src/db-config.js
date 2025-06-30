@@ -4,7 +4,7 @@ const configs = {
   development: {
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'password',
+    password: process.env.DB_PASSWORD || 'qq123456',
     database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4',
     port: process.env.DB_PORT || 3306
@@ -12,32 +12,32 @@ const configs = {
   
   // 测试环境
   test: {
-    host: process.env.TEST_DB_HOST || 'localhost',
-    user: process.env.TEST_DB_USER || 'root',
-    password: process.env.TEST_DB_PASSWORD || 'password',
-    database: process.env.TEST_DB_NAME || 'nest_db_test',
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || 'qq123456',
+    database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4',
-    port: process.env.TEST_DB_PORT || 3306
+    port: process.env.DB_PORT || 3306
   },
   
   // 预发布环境
   staging: {
-    host: process.env.STAGING_DB_HOST || 'localhost',
-    user: process.env.STAGING_DB_USER || 'root',
-    password: process.env.STAGING_DB_PASSWORD || 'password',
-    database: process.env.STAGING_DB_NAME || 'nest_db_staging',
+   host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || 'qq123456',
+    database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4',
-    port: process.env.STAGING_DB_PORT || 3306
+    port: process.env.DB_PORT || 3306
   },
   
   // 生产环境
   production: {
-    host: process.env.PROD_DB_HOST || 'localhost',
-    user: process.env.PROD_DB_USER || 'root',
-    password: process.env.PROD_DB_PASSWORD || 'password',
-    database: process.env.PROD_DB_NAME || 'nest_db_prod',
+   host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || 'qq123456',
+    database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4',
-    port: process.env.PROD_DB_PORT || 3306
+    port: process.env.DB_PORT || 3306
   }
 };
 

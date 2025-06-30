@@ -217,10 +217,21 @@ async function incrementalDeploy(sourceEnv, targetEnv, outputFile = null, autoEx
     validateConfig(sourceConfig);
     validateConfig(targetConfig);
     
+    // 调试信息：显示实际配置值
     console.log(`🔍 连接源数据库 (${sourceEnv})...`);
+    console.log(`   主机: ${sourceConfig.host}:${sourceConfig.port}`);
+    console.log(`   数据库: ${sourceConfig.database}`);
+    console.log(`   用户: "${sourceConfig.user}" (长度: ${sourceConfig.user.length})`);
+    console.log(`   密码: ${sourceConfig.password}`);
+    
     sourceConnection = await mysql.createConnection(sourceConfig);
     
     console.log(`🔍 连接目标数据库 (${targetEnv})...`);
+    console.log(`   主机: ${targetConfig.host}:${targetConfig.port}`);
+    console.log(`   数据库: ${targetConfig.database}`);
+    console.log(`   用户: "${targetConfig.user}" (长度: ${targetConfig.user.length})`);
+    console.log(`   密码: ${targetConfig.password}`);
+    
     targetConnection = await mysql.createConnection(targetConfig);
     
     console.log('🔍 比较数据库差异...');
