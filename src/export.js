@@ -273,4 +273,31 @@ function generateSqlContent(structure, data, databaseName) {
     'COMMIT;',
     'SET FOREIGN_KEY_CHECKS = 1;'
   ].join('\n');
+}
+
+// 解析命令行参数
+const args = process.argv.slice(2);
+const command = args[0];
+
+// 默认输出文件名
+const defaultOutputFile = 'database.sql';
+
+if (command === 'export') {
+  const outputIndex = args.indexOf('-o');
+  const outputFile = outputIndex !== -1 ? args[outputIndex + 1] : defaultOutputFile;
+  
+  console.log('🚀 开始导出数据库...');
+  exportDatabase(outputFile);
+} else if (command === 'import') {
+  const inputIndex = args.indexOf('-i');
+  const inputFile = inputIndex !== -1 ? args[inputIndex + 1] : defaultOutputFile;
+  
+  console.log('🚀 开始导入数据库...');
+  importDatabase(inputFile);
+} else {
+  console.log('❌ 无效的命令');
+  console.log('用法:');
+  console.log('  node export.js export [-o output_file]');
+  console.log('  node export.js import [-i input_file]');
+  process.exit(1);
 } 
