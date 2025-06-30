@@ -205,6 +205,10 @@ jobs:
           echo "🔍 当前所有数据库:"
           sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SHOW DATABASES;"
           
+          # 删除现有表（如果存在）
+          echo "🗑️ 删除现有表..."
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; DROP TABLE IF EXISTS media, migrations, tracker_events, translations, users;"
+          
           # 方法1：先切换到数据库，再导入
           echo "📥 方法1：先切换到数据库 '$DB_NAME'，再导入..."
           sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; source $DB_FILE;"
