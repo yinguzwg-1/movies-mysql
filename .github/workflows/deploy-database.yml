@@ -1,0 +1,141 @@
+name: 🚀 数据库部署到阿里云
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'database.sql'
+      - '.github/workflows/deploy-database.yml'
+  workflow_dispatch:
+    inputs:
+      database_file:
+        description: '数据库文件路径'
+        required: true
+        default: 'database.sql'
+
+jobs:
+  deploy-database:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+
+    - name: 🔍 检查数据库文件
+      run: |
+        DB_FILE="${{ github.event.inputs.database_file || 'database.sql' }}"
+        if [ ! -f "$DB_FILE" ]; then
+          echo "❌ 数据库文件不存在: $DB_FILE"
+          exit 1
+        fi
+        echo "✅ 找到数据库文件: $DB_FILE"
+        ls -la "$DB_FILE"
+
+    - name: 🚀 部署到阿里云服务器
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.ALIYUN_HOST }}
+        username: ${{ secrets.ALIYUN_USERNAME }}
+        key: ${{ secrets.ALIYUN_SSH_KEY }}
+        port: ${{ secrets.ALIYUN_PORT || '22' }}
+        command_timeout: "600s"
+        script: |
+          echo "🚀 开始部署数据库到阿里云服务器..."
+          echo "📦 数据库文件: ${{ github.event.inputs.database_file || 'database.sql' }}"
+          
+          # 检查 MySQL 是否安装
+          if ! command -v mysql &> /dev/null; then
+            echo "📦 安装 MySQL..."
+            sudo apt-get update
+            sudo apt-get install -y mysql-server
+            sudo systemctl start mysql
+            sudo systemctl enable mysql
+          else
+            echo "✅ MySQL 已安装"
+            sudo systemctl start mysql || true
+          fi
+          
+          # 创建数据库用户（如果不存在）
+          echo "🔧 配置数据库用户..."
+          sudo mysql -e "CREATE USER IF NOT EXISTS '${{ secrets.DB_USER }}'@'localhost' IDENTIFIED BY '${{ secrets.DB_PASSWORD }}';" || true
+          sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO '${{ secrets.DB_USER }}'@'localhost' WITH GRANT OPTION;" || true
+          sudo mysql -e "FLUSH PRIVILEGES;" || true
+          
+          # 创建数据库（如果不存在）
+          echo "📊 创建数据库..."
+          sudo mysql -e "CREATE DATABASE IF NOT EXISTS \`${{ secrets.DB_NAME }}\`;" || true
+          
+          # 备份现有数据库（如果存在）
+          echo "📦 备份现有数据库..."
+          BACKUP_FILE="/tmp/backup_${{ secrets.DB_NAME }}_$(date +%Y%m%d_%H%M%S).sql"
+          sudo mysqldump -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} \`${{ secrets.DB_NAME }}\` > "$BACKUP_FILE" 2>/dev/null || echo "⚠️ 备份失败或数据库为空"
+          
+          # 删除现有数据库内容
+          echo "🗑️ 清空现有数据库..."
+          sudo mysql -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} -e "DROP DATABASE IF EXISTS \`${{ secrets.DB_NAME }}\`;"
+          sudo mysql -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} -e "CREATE DATABASE \`${{ secrets.DB_NAME }}\`;"
+          
+          echo "✅ 数据库准备完成"
+
+    - name: 📤 上传数据库文件
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.ALIYUN_HOST }}
+        username: ${{ secrets.ALIYUN_USERNAME }}
+        key: ${{ secrets.ALIYUN_SSH_KEY }}
+        port: ${{ secrets.ALIYUN_PORT || '22' }}
+        source: "${{ github.event.inputs.database_file || 'database.sql' }}"
+        target: "/tmp/"
+
+    - name: 🔄 导入数据库
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.ALIYUN_HOST }}
+        username: ${{ secrets.ALIYUN_USERNAME }}
+        key: ${{ secrets.ALIYUN_SSH_KEY }}
+        port: ${{ secrets.ALIYUN_PORT || '22' }}
+        command_timeout: "600s"
+        script: |
+          echo "📥 导入数据库..."
+          DB_FILE="/tmp/${{ github.event.inputs.database_file || 'database.sql' }}"
+          
+          # 导入数据库
+          sudo mysql -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} \`${{ secrets.DB_NAME }}\` < "$DB_FILE"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ 数据库导入成功！"
+          else
+            echo "❌ 数据库导入失败"
+            exit 1
+          fi
+          
+          # 验证导入结果
+          echo "🔍 验证数据库..."
+          TABLE_COUNT=$(sudo mysql -u${{ secrets.DB_USER }} -p${{ secrets.DB_PASSWORD }} -e "USE \`${{ secrets.DB_NAME }}\`; SHOW TABLES;" | wc -l)
+          echo "📊 数据库表数量: $((TABLE_COUNT - 1))"
+          
+          # 清理临时文件
+          rm -f "$DB_FILE"
+          
+          echo "🎉 数据库部署完成！"
+          echo "🌐 数据库地址: ${{ secrets.ALIYUN_HOST }}:3306"
+          echo "📊 数据库名称: ${{ secrets.DB_NAME }}"
+
+    - name: 🔄 重启应用（可选）
+      uses: appleboy/ssh-action@v1.0.3
+      if: ${{ secrets.RESTART_APP == 'true' }}
+      with:
+        host: ${{ secrets.ALIYUN_HOST }}
+        username: ${{ secrets.ALIYUN_USERNAME }}
+        key: ${{ secrets.ALIYUN_SSH_KEY }}
+        port: ${{ secrets.ALIYUN_PORT || '22' }}
+        script: |
+          echo "🔄 重启应用..."
+          
+          # 重启 PM2 应用
+          pm2 restart all || echo "PM2 未运行"
+          
+          # 重启 Docker 容器
+          docker-compose restart || docker compose restart || echo "Docker Compose 未运行"
+          
+          echo "✅ 应用重启完成" 

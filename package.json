@@ -1,0 +1,25 @@
+{
+  "name": "movies-mysql-simple",
+  "version": "1.0.0",
+  "description": "简单的数据库导出和部署工具",
+  "main": "src/export.js",
+  "scripts": {
+    "export": "node src/export.js",
+    "start": "node src/export.js"
+  },
+  "keywords": [
+    "mysql",
+    "database",
+    "export",
+    "deploy"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "mysql2": "^3.6.5",
+    "dotenv": "^16.3.1",
+    "commander": "^11.1.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1"
+  }
+} 
