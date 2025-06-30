@@ -217,7 +217,14 @@ async function incrementalDeploy(sourceEnv, targetEnv, outputFile = null, autoEx
     validateConfig(sourceConfig);
     validateConfig(targetConfig);
     
-    // 调试信息：显示实际配置值
+    // 调试信息：显示环境变量和最终配置
+    console.log(`🔍 环境变量检查:`);
+    console.log(`   DB_HOST: "${process.env.DB_HOST}"`);
+    console.log(`   DB_USER: "${process.env.DB_USER}"`);
+    console.log(`   DB_PASSWORD: "${process.env.DB_PASSWORD}"`);
+    console.log(`   DB_NAME: "${process.env.DB_NAME}"`);
+    console.log(`   DB_PORT: "${process.env.DB_PORT}"`);
+    
     console.log(`🔍 连接源数据库 (${sourceEnv})...`);
     console.log(`   主机: ${sourceConfig.host}:${sourceConfig.port}`);
     console.log(`   数据库: ${sourceConfig.database}`);
