@@ -17,7 +17,7 @@
 |------------|--------|------|
 | `DB_NAME` | `nest_db` | 数据库名称（不要加引号） |
 | `DB_USER` | `root` | 数据库用户名 |
-| `DB_PASSWORD` | `qq123456` | 数据库密码 |
+| `DB_PASSWORD` | `Zhengwenguo0503.` | 数据库密码 |
 | `ALIYUN_HOST` | `你的服务器IP` | 阿里云服务器IP |
 | `ALIYUN_USERNAME` | `root` | 服务器用户名 |
 | `ALIYUN_SSH_KEY` | `你的SSH私钥` | SSH私钥内容 |

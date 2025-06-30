@@ -26,12 +26,12 @@ SELECT User, Host, plugin FROM mysql.user WHERE User = 'root';
 
 -- 重新创建root用户
 DROP USER IF EXISTS 'root'@'localhost';
-CREATE USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'qq123456';
+CREATE USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'Zhengwenguo0503.';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
 
 -- 创建允许从任何主机连接的root用户
 DROP USER IF EXISTS 'root'@'%';
-CREATE USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'qq123456';
+CREATE USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'Zhengwenguo0503.';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
 
 -- 创建数据库
@@ -58,7 +58,7 @@ else
     echo ""
     echo "然后在MySQL中执行："
     echo "USE mysql;"
-    echo "UPDATE user SET authentication_string=PASSWORD('qq123456') WHERE User='root';"
+    echo "UPDATE user SET authentication_string=PASSWORD('Zhengwenguo0503.') WHERE User='root';"
     echo "FLUSH PRIVILEGES;"
     echo "EXIT;"
     echo ""

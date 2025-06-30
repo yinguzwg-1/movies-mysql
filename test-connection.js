@@ -5,7 +5,7 @@ async function testConnection() {
     host: 'localhost',
     port: 3306,
     user: 'root',
-    password: 'qq123456',
+    password: 'Zhengwenguo0503.',
     database: 'nest_db',
     charset: 'utf8mb4'
   };

@@ -120,7 +120,7 @@ jobs:
           
           # 创建数据库用户（如果不存在）
           echo "🔧 配置数据库用户..."
-          sudo mysql -e "CREATE USER IF NOT EXISTS ${{ secrets.DB_USER }}@localhost IDENTIFIED BY 'qq123456';" || true
+          sudo mysql -e "CREATE USER IF NOT EXISTS ${{ secrets.DB_USER }}@localhost IDENTIFIED BY 'Zhengwenguo0503.';" || true
           sudo mysql -e "GRANT ALL PRIVILEGES ON *.* TO ${{ secrets.DB_USER }}@localhost WITH GRANT OPTION;" || true
           sudo mysql -e "FLUSH PRIVILEGES;" || true
           

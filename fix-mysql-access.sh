@@ -25,15 +25,15 @@ cat << 'EOF'
 SELECT User, Host, plugin FROM mysql.user WHERE User = 'root';
 
 -- 2. 创建/更新root用户（支持localhost连接）
-ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'qq123456';
+ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'Zhengwenguo0503.';
 -- 或者如果使用caching_sha2_password
--- ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY 'qq123456';
+-- ALTER USER 'root'@'localhost' IDENTIFIED WITH caching_sha2_password BY 'Zhengwenguo0503.';
 
 -- 3. 确保root用户有所有权限
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
 
 -- 4. 创建允许从任何主机连接的root用户（如果需要）
-CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'qq123456';
+CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'Zhengwenguo0503.';
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
 
 -- 5. 刷新权限

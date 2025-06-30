@@ -46,8 +46,8 @@ DROP USER IF EXISTS 'root'@'localhost';
 DROP USER IF EXISTS 'root'@'%';
 
 -- 3. 重新创建root用户（使用mysql_native_password认证）
-CREATE USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'qq123456';
-CREATE USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'qq123456';
+CREATE USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'Zhengwenguo0503.';
+CREATE USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY 'Zhengwenguo0503.';
 
 -- 4. 授予所有权限
 GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
@@ -73,7 +73,7 @@ echo "sudo mysql -u root"
 echo ""
 echo "然后在MySQL中执行："
 echo "USE mysql;"
-echo "UPDATE user SET authentication_string=PASSWORD('qq123456') WHERE User='root';"
+echo "UPDATE user SET authentication_string=PASSWORD('Zhengwenguo0503.') WHERE User='root';"
 echo "FLUSH PRIVILEGES;"
 echo "EXIT;"
 echo ""

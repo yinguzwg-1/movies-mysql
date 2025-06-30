@@ -9,7 +9,7 @@ async function diagnoseMySQL() {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT) || 3306,
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'qq123456',
+    password: process.env.DB_PASSWORD || 'Zhengwenguo0503.',
     database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4'
   };
@@ -40,7 +40,7 @@ async function diagnoseMySQL() {
   const config2 = {
     socketPath: '/var/run/mysqld/mysqld.sock',
     user: 'root',
-    password: 'qq123456',
+    password: 'Zhengwenguo0503.',
     database: 'nest_db',
     charset: 'utf8mb4'
   };
@@ -70,7 +70,7 @@ async function diagnoseMySQL() {
     host: '127.0.0.1',
     port: 3306,
     user: 'root',
-    password: 'qq123456',
+    password: 'Zhengwenguo0503.',
     database: 'nest_db',
     charset: 'utf8mb4'
   };

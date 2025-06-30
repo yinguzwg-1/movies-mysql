@@ -4,7 +4,7 @@ const configs = {
   development: {
     host: process.env.DB_HOST || '223.4.248.176',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'qq123456',
+    password: process.env.DB_PASSWORD || 'Zhengwenguo0503.',
     database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4',
     port: process.env.DB_PORT || 3306
@@ -14,7 +14,7 @@ const configs = {
   test: {
     host: process.env.DB_HOST || '223.4.248.176',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'qq123456',
+    password: process.env.DB_PASSWORD || 'Zhengwenguo0503.',
     database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4',
     port: process.env.DB_PORT || 3306
@@ -24,7 +24,7 @@ const configs = {
   staging: {
    host: process.env.DB_HOST || '223.4.248.176',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'qq123456',
+    password: process.env.DB_PASSWORD || 'Zhengwenguo0503.',
     database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4',
     port: process.env.DB_PORT || 3306
@@ -34,7 +34,7 @@ const configs = {
   production: {
    host: process.env.DB_HOST || '223.4.248.176',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'qq123456',
+    password: process.env.DB_PASSWORD || 'Zhengwenguo0503.',
     database: process.env.DB_NAME || 'nest_db',
     charset: 'utf8mb4',
     port: process.env.DB_PORT || 3306
