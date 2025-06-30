@@ -178,19 +178,43 @@ async function getDatabaseData(connection) {
     const [rows] = await connection.execute(`SELECT * FROM \`${tableName}\``);
     
     if (rows.length > 0) {
-      // 获取列名
+      // 获取列名和列类型
       const [columns] = await connection.execute(`DESCRIBE \`${tableName}\``);
       const columnNames = columns.map(col => col.Field);
+      const columnTypes = columns.map(col => col.Type);
       
       // 生成INSERT语句
       data.push(`-- 表 ${tableName} 的数据`);
       data.push(`INSERT INTO \`${tableName}\` (\`${columnNames.join('`, `')}\`) VALUES`);
       
       const values = rows.map(row => {
-        const rowValues = columnNames.map(col => {
+        const rowValues = columnNames.map((col, index) => {
           const value = row[col];
           if (value === null) return 'NULL';
-          if (typeof value === 'string') return `'${value.replace(/'/g, "''")}'`;
+          
+          // 处理日期时间类型
+          if (value instanceof Date) {
+            return `'${value.toISOString().slice(0, 19).replace('T', ' ')}'`;
+          }
+          
+          // 处理字符串类型的日期时间
+          if (typeof value === 'string') {
+            // 检查是否是日期时间格式
+            if (value.match(/^\w{3}\s+\w{3}\s+\d{1,2}\s+\d{4}\s+\d{2}:\d{2}:\d{2}\s+GMT\+\d{4}/)) {
+              try {
+                const date = new Date(value);
+                if (!isNaN(date.getTime())) {
+                  return `'${date.toISOString().slice(0, 19).replace('T', ' ')}'`;
+                }
+              } catch (e) {
+                // 如果解析失败，使用原始值
+              }
+            }
+            
+            // 处理普通字符串，转义单引号
+            return `'${value.replace(/'/g, "''")}'`;
+          }
+          
           return value;
         });
         return `(${rowValues.join(', ')})`;
