@@ -48,6 +48,8 @@ jobs:
           echo "数据库密码长度: ${#DB_PASSWORD} 字符"
           echo "=========================================="
           
+          DB_NAME="${{ secrets.DB_NAME }}"
+          
           # 检查 MySQL 是否安装
           if ! command -v mysql &> /dev/null; then
             echo "📦 安装 MySQL..."
@@ -72,7 +74,7 @@ jobs:
           
           # 创建数据库（如果不存在）
           echo "📊 创建数据库..."
-          sudo mysql -e "CREATE DATABASE IF NOT EXISTS \`${{ secrets.DB_NAME }}\`;" || true
+          sudo mysql -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\`;" || true
           
           # 显示所有数据库
           echo "🔍 当前所有数据库:"
@@ -108,13 +110,13 @@ jobs:
           
           # 备份现有数据库（如果存在）
           echo "📦 备份现有数据库..."
-          BACKUP_FILE="/tmp/backup_${{ secrets.DB_NAME }}_$(date +%Y%m%d_%H%M%S).sql"
-          sudo mysqldump --defaults-extra-file="$MYSQL_CNF" \`${{ secrets.DB_NAME }}\` > "$BACKUP_FILE" 2>/dev/null || echo "⚠️ 备份失败或数据库为空"
+          BACKUP_FILE="/tmp/backup_$DB_NAME_$(date +%Y%m%d_%H%M%S).sql"
+          sudo mysqldump --defaults-extra-file="$MYSQL_CNF" \`$DB_NAME\` > "$BACKUP_FILE" 2>/dev/null || echo "⚠️ 备份失败或数据库为空"
           
           # 删除现有数据库内容
           echo "🗑️ 清空现有数据库..."
-          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "DROP DATABASE IF EXISTS \`${{ secrets.DB_NAME }}\`;"
-          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "CREATE DATABASE \`${{ secrets.DB_NAME }}\`;"
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "DROP DATABASE IF EXISTS \`$DB_NAME\`;"
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "CREATE DATABASE \`$DB_NAME\`;"
           
           # 清理配置文件
           rm -f "$MYSQL_CNF"
@@ -150,6 +152,7 @@ jobs:
           echo "=========================================="
           
           DB_FILE="/tmp/${{ github.event.inputs.database_file || 'database.sql' }}"
+          DB_NAME="${{ secrets.DB_NAME }}"
           
           # 检查文件是否存在
           if [ ! -f "$DB_FILE" ]; then
@@ -190,47 +193,71 @@ jobs:
           
           # 检查数据库是否存在
           echo "🔍 检查数据库是否存在..."
-          DB_EXISTS=$(sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SHOW DATABASES LIKE '${{ secrets.DB_NAME }}';" 2>/dev/null | wc -l)
+          DB_EXISTS=$(sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SHOW DATABASES LIKE '$DB_NAME';" 2>/dev/null | wc -l)
           if [ "$DB_EXISTS" -gt 1 ]; then
-            echo "✅ 数据库 '${{ secrets.DB_NAME }}' 已存在"
+            echo "✅ 数据库 '$DB_NAME' 已存在"
           else
-            echo "⚠️ 数据库 '${{ secrets.DB_NAME }}' 不存在，将创建"
-            sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "CREATE DATABASE \`${{ secrets.DB_NAME }}\`;"
+            echo "⚠️ 数据库 '$DB_NAME' 不存在，将创建"
+            sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "CREATE DATABASE \`$DB_NAME\`;"
           fi
           
           # 显示所有数据库
           echo "🔍 当前所有数据库:"
           sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "SHOW DATABASES;"
           
-          # 使用配置文件导入数据库
-          echo "📥 开始导入数据库到 '${{ secrets.DB_NAME }}'..."
-          sudo mysql --defaults-extra-file="$MYSQL_CNF" \`${{ secrets.DB_NAME }}\` < "$DB_FILE"
+          # 方法1：先切换到数据库，再导入
+          echo "📥 方法1：先切换到数据库 '$DB_NAME'，再导入..."
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; source $DB_FILE;"
           
           if [ $? -eq 0 ]; then
             echo "✅ 数据库导入成功！"
           else
-            echo "❌ 数据库导入失败"
-            echo "🔍 导入错误详情:"
-            sudo mysql --defaults-extra-file="$MYSQL_CNF" \`${{ secrets.DB_NAME }}\` < "$DB_FILE" 2>&1
-            # 清理配置文件
-            rm -f "$MYSQL_CNF"
-            exit 1
+            echo "❌ 方法1失败，尝试方法2..."
+            
+            # 方法2：直接指定数据库导入
+            echo "📥 方法2：直接指定数据库 '$DB_NAME' 导入..."
+            sudo mysql --defaults-extra-file="$MYSQL_CNF" \`$DB_NAME\` < "$DB_FILE"
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ 数据库导入成功！"
+            else
+              echo "❌ 方法2也失败，尝试方法3..."
+              
+              # 方法3：创建临时SQL文件，包含USE语句
+              echo "📥 方法3：创建包含USE语句的临时文件..."
+              TEMP_SQL="/tmp/temp_import.sql"
+              echo "USE \`$DB_NAME\`;" > "$TEMP_SQL"
+              cat "$DB_FILE" >> "$TEMP_SQL"
+              
+              sudo mysql --defaults-extra-file="$MYSQL_CNF" < "$TEMP_SQL"
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ 数据库导入成功！"
+                rm -f "$TEMP_SQL"
+              else
+                echo "❌ 所有方法都失败了"
+                echo "🔍 导入错误详情:"
+                sudo mysql --defaults-extra-file="$MYSQL_CNF" < "$TEMP_SQL" 2>&1
+                rm -f "$TEMP_SQL" "$MYSQL_CNF"
+                exit 1
+              fi
+            fi
           fi
           
           # 验证导入结果
           echo "🔍 验证数据库..."
-          TABLE_COUNT=$(sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`${{ secrets.DB_NAME }}\`; SHOW TABLES;" | wc -l)
+          TABLE_COUNT=$(sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; SHOW TABLES;" | wc -l)
           echo "📊 数据库表数量: $((TABLE_COUNT - 1))"
           
           echo "🔍 数据库中的表:"
-          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`${{ secrets.DB_NAME }}\`; SHOW TABLES;"
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; SHOW TABLES;"
           
           # 清理临时文件
           rm -f "$DB_FILE" "$MYSQL_CNF"
           
           echo "🎉 数据库部署完成！"
           echo "🌐 数据库地址: ${{ secrets.ALIYUN_HOST }}:3306"
-          echo "📊 数据库名称: ${{ secrets.DB_NAME }}"
+          echo "📊 数据库名称: $DB_NAME"
           echo "🔍 调试信息结束 ========================"
 
     - name: 🔄 重启应用
