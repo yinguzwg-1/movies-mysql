@@ -4,9 +4,9 @@ on:
   push:
     branches: [ main, master ]
     paths:
-      - 'database.sql'
-      - 'src/**'
-      - '.github/workflows/deploy-database.yml'
+      - 'movies-mysql/database.sql'
+      - 'movies-mysql/src/**'
+      - 'movies-mysql/.github/workflows/deploy-database.yml'
   workflow_dispatch:
     inputs:
       deploy_type:
@@ -40,7 +40,7 @@ on:
       database_file:
         description: '数据库文件路径（仅用于完整部署）'
         required: false
-        default: 'database.sql'
+        default: 'movies-mysql/database.sql'
 
 jobs:
   deploy-database:
@@ -72,7 +72,7 @@ jobs:
         echo "📥 目标环境: $TARGET_ENV"
         
         if [ "$DEPLOY_TYPE" = "full" ]; then
-          DB_FILE="${{ github.event.inputs.database_file || 'database.sql' }}"
+          DB_FILE="${{ github.event.inputs.database_file || 'movies-mysql/database.sql' }}"
           if [ ! -f "$DB_FILE" ]; then
             echo "❌ 数据库文件不存在: $DB_FILE"
             exit 1
@@ -252,7 +252,7 @@ jobs:
             echo "🔄 执行完整部署: $SOURCE_ENV -> $TARGET_ENV"
             
             # 上传数据库文件（如果指定）
-            DB_FILE="${{ github.event.inputs.database_file || 'database.sql' }}"
+            DB_FILE="${{ github.event.inputs.database_file || 'movies-mysql/database.sql' }}"
             if [ -f "/tmp/$DB_FILE" ]; then
               echo "📤 使用指定的数据库文件: $DB_FILE"
               cp "/tmp/$DB_FILE" .
