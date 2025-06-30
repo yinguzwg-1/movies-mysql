@@ -1,5 +1,5 @@
 -- 数据库导出
--- 创建时间: 2025-06-30T07:19:11.768Z
+-- 创建时间: 2025-06-30T08:03:10.505Z
 -- 数据库: nest_db
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -7,6 +7,12 @@ SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET AUTOCOMMIT = 0;
 START TRANSACTION;
 SET time_zone = "+00:00";
+
+-- 创建数据库
+-- --------------------------------------------------------
+
+CREATE DATABASE IF NOT EXISTS `nest_db` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `nest_db`;
 
 -- 数据库结构
 -- --------------------------------------------------------

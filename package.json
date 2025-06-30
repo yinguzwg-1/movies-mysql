@@ -4,8 +4,8 @@
   "description": "简单的数据库导出和部署工具",
   "main": "src/export.js",
   "scripts": {
-    "export": "node src/export.js",
-    "start": "node src/export.js"
+    "export": "node src/export.js export -d nest_db",
+    "start": "node src/export.js export -d nest_db"
   },
   "keywords": [
     "mysql",

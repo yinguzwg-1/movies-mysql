@@ -20,9 +20,10 @@ program
   .command('export')
   .description('导出数据库到 SQL 文件')
   .option('-o, --output <file>', '输出文件名', 'database.sql')
+  .option('-d, --database <name>', '目标数据库名称', 'nest_db')
   .action(async (options) => {
     try {
-      await exportDatabase(options.output);
+      await exportDatabase(options.output, options.database);
     } catch (error) {
       console.error(chalk.red('❌ 导出失败:'), error.message);
       process.exit(1);
@@ -37,7 +38,7 @@ if (!process.argv.slice(2).length) {
 }
 
 // 导出数据库
-async function exportDatabase(outputFile = 'database.sql') {
+async function exportDatabase(outputFile = 'database.sql', targetDatabase = 'nest_db') {
   const spinner = ora('正在导出数据库...').start();
   
   try {
@@ -61,6 +62,9 @@ async function exportDatabase(outputFile = 'database.sql') {
       throw new Error('请设置 LOCAL_DB_NAME 环境变量');
     }
     
+    console.log(chalk.blue(`📊 从数据库: ${config.database}`));
+    console.log(chalk.blue(`📊 导出到数据库: ${targetDatabase}`));
+    
     // 连接数据库
     spinner.text = '正在连接数据库...';
     const connection = await mysql.createConnection(config);
@@ -78,7 +82,7 @@ async function exportDatabase(outputFile = 'database.sql') {
     
     // 生成 SQL 文件
     spinner.text = '正在生成 SQL 文件...';
-    const sqlContent = generateSqlContent(structure, data, config.database);
+    const sqlContent = generateSqlContent(structure, data, targetDatabase);
     
     // 确保输出目录存在
     const outputDir = path.dirname(outputFile);
@@ -96,6 +100,7 @@ async function exportDatabase(outputFile = 'database.sql') {
     const stats = fs.statSync(outputFile);
     const fileSize = (stats.size / 1024).toFixed(2);
     console.log(chalk.blue(`📊 文件大小: ${fileSize} KB`));
+    console.log(chalk.blue(`🎯 目标数据库: ${targetDatabase}`));
     
   } catch (error) {
     spinner.fail(chalk.red('❌ 导出失败'));
@@ -183,6 +188,12 @@ function generateSqlContent(structure, data, databaseName) {
     'SET AUTOCOMMIT = 0;',
     'START TRANSACTION;',
     'SET time_zone = "+00:00";',
+    '',
+    '-- 创建数据库',
+    '-- --------------------------------------------------------',
+    '',
+    `CREATE DATABASE IF NOT EXISTS \`${databaseName}\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`,
+    `USE \`${databaseName}\`;`,
     '',
     '-- 数据库结构',
     '-- --------------------------------------------------------',
