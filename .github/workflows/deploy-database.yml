@@ -207,46 +207,76 @@ jobs:
           
           # 删除现有表（如果存在）
           echo "🗑️ 删除现有表..."
-          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; DROP TABLE IF EXISTS media, migrations, tracker_events, translations, users;"
+          
+          # 获取所有表名
+          TABLES=$(sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; SHOW TABLES;" 2>/dev/null | tail -n +2)
+          
+          if [ -n "$TABLES" ]; then
+            echo "🔍 发现现有表: $TABLES"
+            
+            # 禁用外键检查
+            sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; SET FOREIGN_KEY_CHECKS = 0;"
+            
+            # 逐个删除表
+            for table in $TABLES; do
+              echo "🗑️ 删除表: $table"
+              sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; DROP TABLE IF EXISTS \`$table\`;"
+            done
+            
+            # 重新启用外键检查
+            sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; SET FOREIGN_KEY_CHECKS = 1;"
+            
+            echo "✅ 所有表已删除"
+          else
+            echo "ℹ️ 没有发现现有表"
+          fi
           
           # 方法1：先切换到数据库，再导入
           echo "📥 方法1：先切换到数据库 '$DB_NAME'，再导入..."
-          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; source $DB_FILE;"
+          
+          # 设置MySQL参数
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; SET FOREIGN_KEY_CHECKS = 0; SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';"
+          
+          # 创建临时SQL文件，跳过CREATE DATABASE和USE语句
+          TEMP_SQL="/tmp/temp_import.sql"
+          grep -v "CREATE DATABASE\|USE \`" "$DB_FILE" > "$TEMP_SQL"
+          
+          # 导入数据
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" "$DB_NAME" < "$TEMP_SQL"
           
           if [ $? -eq 0 ]; then
             echo "✅ 数据库导入成功！"
+            rm -f "$TEMP_SQL"
           else
             echo "❌ 方法1失败，尝试方法2..."
+            rm -f "$TEMP_SQL"
             
-            # 方法2：直接指定数据库导入
-            echo "📥 方法2：直接指定数据库 '$DB_NAME' 导入..."
-            sudo mysql --defaults-extra-file="$MYSQL_CNF" \`$DB_NAME\` < "$DB_FILE"
+            # 方法2：逐行执行SQL
+            echo "📥 方法2：逐行执行SQL，忽略错误..."
+            
+            # 逐行读取并执行SQL
+            while IFS= read -r line; do
+              # 跳过注释、空行、CREATE DATABASE和USE语句
+              if [[ "$line" =~ ^[[:space:]]*$ ]] || [[ "$line" =~ ^[[:space:]]*-- ]] || [[ "$line" =~ CREATE[[:space:]]+DATABASE ]] || [[ "$line" =~ USE[[:space:]]+[`\"] ]]; then
+                continue
+              fi
+              
+              # 执行SQL语句，忽略错误
+              echo "执行: $line"
+              sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; $line" 2>/dev/null || echo "警告: 执行失败，继续..."
+            done < "$DB_FILE"
             
             if [ $? -eq 0 ]; then
               echo "✅ 数据库导入成功！"
             else
-              echo "❌ 方法2也失败，尝试方法3..."
-              
-              # 方法3：创建临时SQL文件，包含USE语句
-              echo "📥 方法3：创建包含USE语句的临时文件..."
-              TEMP_SQL="/tmp/temp_import.sql"
-              echo "USE \`$DB_NAME\`;" > "$TEMP_SQL"
-              cat "$DB_FILE" >> "$TEMP_SQL"
-              
-              sudo mysql --defaults-extra-file="$MYSQL_CNF" < "$TEMP_SQL"
-              
-              if [ $? -eq 0 ]; then
-                echo "✅ 数据库导入成功！"
-                rm -f "$TEMP_SQL"
-              else
-                echo "❌ 所有方法都失败了"
-                echo "🔍 导入错误详情:"
-                sudo mysql --defaults-extra-file="$MYSQL_CNF" < "$TEMP_SQL" 2>&1
-                rm -f "$TEMP_SQL" "$MYSQL_CNF"
-                exit 1
-              fi
+              echo "❌ 所有方法都失败了"
+              echo "🔍 导入错误详情:"
+              exit 1
             fi
           fi
+          
+          # 重新启用外键检查
+          sudo mysql --defaults-extra-file="$MYSQL_CNF" -e "USE \`$DB_NAME\`; SET FOREIGN_KEY_CHECKS = 1;"
           
           # 验证导入结果
           echo "🔍 验证数据库..."

@@ -1,70 +1,117 @@
-# 🚀 快速修复 GitHub Secrets
+# 🔧 修复 GitHub Secrets 配置问题
 
-## 问题
-数据库名称显示为 `***`，说明 GitHub Secrets 配置有问题。
+## 问题分析
 
-## 快速修复步骤
+从错误日志可以看出，主要问题是：
 
-### 1. 进入 GitHub 仓库设置
-1. 打开你的 GitHub 仓库
-2. 点击 `Settings` 标签
-3. 点击左侧菜单 `Secrets and variables` → `Actions`
+1. **数据库名称显示为 `***`** - GitHub Secrets 没有正确配置
+2. **表删除逻辑没有正确执行** - 导致 "Table already exists" 错误
+3. **重复索引错误** - 需要更好的错误处理
 
-### 2. 删除有问题的 Secret
-1. 找到 `DB_NAME` Secret
-2. 点击旁边的垃圾桶图标 🗑️
-3. 确认删除
+## 解决方案
 
-### 3. 重新创建 DB_NAME Secret
-1. 点击 `New repository secret`
-2. Name: `DB_NAME`
-3. Value: `nest_db` （不要加引号，不要加空格）
-4. 点击 `Add secret`
+### 1. 检查 GitHub Secrets 配置
 
-### 4. 验证其他 Secrets
-确保以下 Secrets 都存在且正确：
+请确保在 GitHub 仓库的 Settings > Secrets and variables > Actions 中设置了以下 secrets：
 
-| Secret | 值 |
-|--------|-----|
-| `DB_NAME` | `nest_db` |
-| `DB_USER` | `root` |
-| `DB_PASSWORD` | `qq123456` |
-| `ALIYUN_HOST` | 你的服务器IP |
-| `ALIYUN_USERNAME` | `root` |
-| `ALIYUN_SSH_KEY` | 你的SSH私钥 |
+```
+MYSQL_HOST=你的MySQL主机地址
+MYSQL_PORT=3306
+MYSQL_USER=你的MySQL用户名
+MYSQL_PASSWORD=你的MySQL密码
+MYSQL_DATABASE=你的数据库名称
+ALIYUN_HOST=你的阿里云服务器IP
+ALIYUN_USERNAME=你的阿里云服务器用户名
+ALIYUN_SSH_KEY=你的SSH私钥
+ALIYUN_PORT=22
+```
 
-### 5. 重新生成数据库文件
+### 2. 手动执行数据库重置
 
-#### Windows
+如果 GitHub Actions 持续失败，可以手动在服务器上执行以下命令：
+
 ```bash
-regenerate-db.bat
+# 连接到MySQL
+mysql -u root -p
+
+# 删除现有数据库
+DROP DATABASE IF EXISTS your_database_name;
+
+# 创建新数据库
+CREATE DATABASE your_database_name;
+
+# 退出MySQL
+exit
+
+# 导入数据
+mysql -u your_username -p your_database_name < /path/to/database.sql
 ```
 
-#### Linux/Mac
-```bash
-chmod +x regenerate-db.sh
-./regenerate-db.sh
+### 3. 修复重复索引问题
+
+如果遇到重复索引错误，可以手动删除索引：
+
+```sql
+-- 连接到数据库
+USE your_database_name;
+
+-- 查看所有索引
+SHOW INDEX FROM tracker_events;
+
+-- 删除重复索引
+DROP INDEX idx_event_user ON tracker_events;
+
+-- 重新创建索引（如果需要）
+CREATE INDEX idx_event_user ON tracker_events(user_id, event_type);
 ```
 
-### 6. 推送代码
-```bash
-git add database.sql
-git commit -m "重新生成数据库文件"
-git push
+### 4. 验证数据库状态
+
+```sql
+-- 检查数据库是否存在
+SHOW DATABASES;
+
+-- 检查表是否存在
+USE your_database_name;
+SHOW TABLES;
+
+-- 检查表结构
+DESCRIBE media;
+DESCRIBE tracker_events;
+DESCRIBE translations;
 ```
 
-## 预期结果
+## 常见错误及解决方案
 
-修复后，GitHub Actions 日志应该显示：
+### 错误1: Unknown database
 ```
-数据库名称: 'nest_db'
-✅ 数据库 'nest_db' 已存在
-📥 方法1：先切换到数据库 'nest_db'，再导入...
-✅ 数据库导入成功！
+ERROR 1049 (42000): Unknown database '`***`'
 ```
+**解决方案**: 检查 `MYSQL_DATABASE` secret 是否正确设置
 
-## 如果还有问题
+### 错误2: Table already exists
+```
+ERROR 1050 (42S01) at line 21: Table 'media' already exists
+```
+**解决方案**: 确保删除表的逻辑正确执行，或者手动删除表
 
-1. **检查 Secrets 权限** - 确保仓库有 Actions 权限
-2. **重新创建所有 Secrets** - 删除并重新创建所有相关 Secrets
-3. **检查仓库设置** - 确保 Actions 功能已启用 
+### 错误3: Duplicate key name
+```
+ERROR 1061 (42000) at line 73: Duplicate key name 'idx_event_user'
+```
+**解决方案**: 删除重复索引或使用 `IF NOT EXISTS` 语法
+
+## 测试步骤
+
+1. 检查 GitHub Secrets 配置
+2. 手动测试数据库连接
+3. 清理现有数据库
+4. 重新导入数据
+5. 验证导入结果
+
+## 联系支持
+
+如果问题仍然存在，请提供：
+- 完整的错误日志
+- GitHub Secrets 配置截图（隐藏敏感信息）
+- 数据库结构信息 
