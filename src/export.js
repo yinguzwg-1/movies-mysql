@@ -120,14 +120,27 @@ async function getDatabaseStructure(connection) {
     
     // 获取建表语句
     const [createTable] = await connection.execute(`SHOW CREATE TABLE \`${tableName}\``);
-    structure.push(createTable[0]['Create Table'] + ';');
+    const createTableSql = createTable[0]['Create Table'] + ';';
+    structure.push(createTableSql);
+    
+    // 从CREATE TABLE语句中提取已定义的索引名称
+    const definedIndexes = new Set();
+    const indexMatches = createTableSql.match(/KEY\s+`([^`]+)`\s*\([^)]+\)/g);
+    if (indexMatches) {
+      indexMatches.forEach(match => {
+        const indexNameMatch = match.match(/KEY\s+`([^`]+)`/);
+        if (indexNameMatch) {
+          definedIndexes.add(indexNameMatch[1]);
+        }
+      });
+    }
     
     // 获取索引信息，避免重复
     const [indexes] = await connection.execute(`SHOW INDEX FROM \`${tableName}\``);
     const processedIndexes = new Set(); // 用于跟踪已处理的索引
     
     for (const index of indexes) {
-      if (index.Key_name !== 'PRIMARY') {
+      if (index.Key_name !== 'PRIMARY' && !definedIndexes.has(index.Key_name)) {
         const indexKey = `${tableName}.${index.Key_name}`;
         
         // 如果这个索引还没有处理过
