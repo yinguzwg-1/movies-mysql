@@ -121,21 +121,25 @@ jobs:
           echo "🌐 数据库地址: ${{ secrets.ALIYUN_HOST }}:3306"
           echo "📊 数据库名称: ${{ secrets.DB_NAME }}"
 
-    - name: 🔄 重启应用（可选）
+    - name: 🔄 重启应用
       uses: appleboy/ssh-action@v1.0.3
-      if: ${{ secrets.RESTART_APP == 'true' }}
       with:
         host: ${{ secrets.ALIYUN_HOST }}
         username: ${{ secrets.ALIYUN_USERNAME }}
         key: ${{ secrets.ALIYUN_SSH_KEY }}
         port: ${{ secrets.ALIYUN_PORT || '22' }}
         script: |
-          echo "🔄 重启应用..."
+          echo "🔄 检查是否需要重启应用..."
           
-          # 重启 PM2 应用
-          pm2 restart all || echo "PM2 未运行"
+          # 检查是否有应用需要重启
+          if command -v pm2 &> /dev/null; then
+            echo "🔄 重启 PM2 应用..."
+            pm2 restart all || echo "PM2 重启失败或无应用运行"
+          fi
           
-          # 重启 Docker 容器
-          docker-compose restart || docker compose restart || echo "Docker Compose 未运行"
+          if command -v docker-compose &> /dev/null || command -v docker &> /dev/null; then
+            echo "🔄 重启 Docker 容器..."
+            docker-compose restart 2>/dev/null || docker compose restart 2>/dev/null || echo "Docker Compose 重启失败或无容器运行"
+          fi
           
-          echo "✅ 应用重启完成" 
+          echo "✅ 应用重启检查完成" 
