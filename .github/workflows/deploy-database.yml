@@ -177,71 +177,70 @@ jobs:
             echo "🔄 执行增量部署: $SOURCE_ENV -> $TARGET_ENV"
             
             # 创建配置文件
-            cat > src/db-config.js << 'EOF'
-            const configs = {
-              development: {
-                host: process.env.DB_HOST || 'localhost',
-                user: process.env.DB_USER || 'root',
-                password: process.env.DB_PASSWORD || 'password',
-                database: process.env.DB_NAME || 'nest_db',
-                charset: 'utf8mb4',
-                port: process.env.DB_PORT || 3306
-              },
-              test: {
-                host: process.env.DB_HOST || 'localhost',
-                user: process.env.DB_USER || 'root',
-                password: process.env.DB_PASSWORD || 'password',
-                database: process.env.DB_NAME || 'nest_db_test',
-                charset: 'utf8mb4',
-                port: process.env.DB_PORT || 3306
-              },
-              staging: {
-                host: process.env.DB_HOST || 'localhost',
-                user: process.env.DB_USER || 'root',
-                password: process.env.DB_PASSWORD || 'password',
-                database: process.env.DB_NAME || 'nest_db_staging',
-                charset: 'utf8mb4',
-                port: process.env.DB_PORT || 3306
-              },
-              production: {
-                host: process.env.DB_HOST || 'localhost',
-                user: process.env.DB_USER || 'root',
-                password: process.env.DB_PASSWORD || 'password',
-                database: process.env.DB_NAME || 'nest_db_prod',
-                charset: 'utf8mb4',
-                port: process.env.DB_PORT || 3306
-              }
-            };
-            
-            function getConfig(environment = 'development') {
-              const config = configs[environment];
-              if (!config) {
-                throw new Error(`未知的环境配置: ${environment}`);
-              }
-              return config;
-            }
-            
-            function getAvailableEnvironments() {
-              return Object.keys(configs);
-            }
-            
-            function validateConfig(config) {
-              const required = ['host', 'user', 'password', 'database'];
-              for (const field of required) {
-                if (!config[field]) {
-                  throw new Error(`缺少必需的配置字段: ${field}`);
-                }
-              }
-              return true;
-            }
-            
-            module.exports = {
-              getConfig,
-              getAvailableEnvironments,
-              validateConfig,
-              configs
-            };
-            EOF
+            mkdir -p src
+            echo "const configs = {" > src/db-config.js
+            echo "  development: {" >> src/db-config.js
+            echo "    host: process.env.DB_HOST || 'localhost'," >> src/db-config.js
+            echo "    user: process.env.DB_USER || 'root'," >> src/db-config.js
+            echo "    password: process.env.DB_PASSWORD || 'password'," >> src/db-config.js
+            echo "    database: process.env.DB_NAME || 'nest_db'," >> src/db-config.js
+            echo "    charset: 'utf8mb4'," >> src/db-config.js
+            echo "    port: process.env.DB_PORT || 3306" >> src/db-config.js
+            echo "  }," >> src/db-config.js
+            echo "  test: {" >> src/db-config.js
+            echo "    host: process.env.DB_HOST || 'localhost'," >> src/db-config.js
+            echo "    user: process.env.DB_USER || 'root'," >> src/db-config.js
+            echo "    password: process.env.DB_PASSWORD || 'password'," >> src/db-config.js
+            echo "    database: process.env.DB_NAME || 'nest_db_test'," >> src/db-config.js
+            echo "    charset: 'utf8mb4'," >> src/db-config.js
+            echo "    port: process.env.DB_PORT || 3306" >> src/db-config.js
+            echo "  }," >> src/db-config.js
+            echo "  staging: {" >> src/db-config.js
+            echo "    host: process.env.DB_HOST || 'localhost'," >> src/db-config.js
+            echo "    user: process.env.DB_USER || 'root'," >> src/db-config.js
+            echo "    password: process.env.DB_PASSWORD || 'password'," >> src/db-config.js
+            echo "    database: process.env.DB_NAME || 'nest_db_staging'," >> src/db-config.js
+            echo "    charset: 'utf8mb4'," >> src/db-config.js
+            echo "    port: process.env.DB_PORT || 3306" >> src/db-config.js
+            echo "  }," >> src/db-config.js
+            echo "  production: {" >> src/db-config.js
+            echo "    host: process.env.DB_HOST || 'localhost'," >> src/db-config.js
+            echo "    user: process.env.DB_USER || 'root'," >> src/db-config.js
+            echo "    password: process.env.DB_PASSWORD || 'password'," >> src/db-config.js
+            echo "    database: process.env.DB_NAME || 'nest_db_prod'," >> src/db-config.js
+            echo "    charset: 'utf8mb4'," >> src/db-config.js
+            echo "    port: process.env.DB_PORT || 3306" >> src/db-config.js
+            echo "  }" >> src/db-config.js
+            echo "};" >> src/db-config.js
+            echo "" >> src/db-config.js
+            echo "function getConfig(environment = 'development') {" >> src/db-config.js
+            echo "  const config = configs[environment];" >> src/db-config.js
+            echo "  if (!config) {" >> src/db-config.js
+            echo "    throw new Error(\`未知的环境配置: \${environment}\`);" >> src/db-config.js
+            echo "  }" >> src/db-config.js
+            echo "  return config;" >> src/db-config.js
+            echo "}" >> src/db-config.js
+            echo "" >> src/db-config.js
+            echo "function getAvailableEnvironments() {" >> src/db-config.js
+            echo "  return Object.keys(configs);" >> src/db-config.js
+            echo "}" >> src/db-config.js
+            echo "" >> src/db-config.js
+            echo "function validateConfig(config) {" >> src/db-config.js
+            echo "  const required = ['host', 'user', 'password', 'database'];" >> src/db-config.js
+            echo "  for (const field of required) {" >> src/db-config.js
+            echo "    if (!config[field]) {" >> src/db-config.js
+            echo "      throw new Error(\`缺少必需的配置字段: \${field}\`);" >> src/db-config.js
+            echo "    }" >> src/db-config.js
+            echo "  }" >> src/db-config.js
+            echo "  return true;" >> src/db-config.js
+            echo "}" >> src/db-config.js
+            echo "" >> src/db-config.js
+            echo "module.exports = {" >> src/db-config.js
+            echo "  getConfig," >> src/db-config.js
+            echo "  getAvailableEnvironments," >> src/db-config.js
+            echo "  validateConfig," >> src/db-config.js
+            echo "  configs" >> src/db-config.js
+            echo "};" >> src/db-config.js
             
             # 执行增量部署
             node src/incremental-deploy.js "$SOURCE_ENV" "$TARGET_ENV" --execute
