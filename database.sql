@@ -1,5 +1,5 @@
 -- 数据库导出
--- 创建时间: 2025-06-30T08:03:10.505Z
+-- 创建时间: 2025-06-30T08:17:56.265Z
 -- 数据库: nest_db
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -70,8 +70,7 @@ CREATE TABLE `tracker_events` (
   KEY `idx_app_id` (`app_id`),
   KEY `idx_user_id` (`user_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户行为追踪事件表';
-CREATE INDEX `idx_event_user` ON `tracker_events` (`event_id`);
-CREATE INDEX `idx_event_user` ON `tracker_events` (`user_id`);
+CREATE INDEX `idx_event_user` ON `tracker_events` (`event_id`, `user_id`);
 CREATE INDEX `idx_session` ON `tracker_events` (`session_id`);
 CREATE INDEX `idx_event_time` ON `tracker_events` (`event_time`);
 CREATE INDEX `idx_app_id` ON `tracker_events` (`app_id`);
@@ -89,12 +88,8 @@ CREATE TABLE `translations` (
   KEY `IDX_MEDIA_LANG_FIELD` (`mediaId`,`language`,`field`),
   CONSTRAINT `FK_TRANSLATION_MEDIA` FOREIGN KEY (`mediaId`) REFERENCES `media` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=3601 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE INDEX `UQ_MEDIA_LANG_FIELD` ON `translations` (`mediaId`);
-CREATE INDEX `UQ_MEDIA_LANG_FIELD` ON `translations` (`language`);
-CREATE INDEX `UQ_MEDIA_LANG_FIELD` ON `translations` (`field`);
-CREATE INDEX `IDX_MEDIA_LANG_FIELD` ON `translations` (`mediaId`);
-CREATE INDEX `IDX_MEDIA_LANG_FIELD` ON `translations` (`language`);
-CREATE INDEX `IDX_MEDIA_LANG_FIELD` ON `translations` (`field`);
+CREATE INDEX `UQ_MEDIA_LANG_FIELD` ON `translations` (`mediaId`, `language`, `field`);
+CREATE INDEX `IDX_MEDIA_LANG_FIELD` ON `translations` (`mediaId`, `language`, `field`);
 CREATE TABLE `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,

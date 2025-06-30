@@ -122,11 +122,28 @@ async function getDatabaseStructure(connection) {
     const [createTable] = await connection.execute(`SHOW CREATE TABLE \`${tableName}\``);
     structure.push(createTable[0]['Create Table'] + ';');
     
-    // 获取索引
+    // 获取索引信息，避免重复
     const [indexes] = await connection.execute(`SHOW INDEX FROM \`${tableName}\``);
+    const processedIndexes = new Set(); // 用于跟踪已处理的索引
+    
     for (const index of indexes) {
       if (index.Key_name !== 'PRIMARY') {
-        structure.push(`CREATE INDEX \`${index.Key_name}\` ON \`${tableName}\` (\`${index.Column_name}\`);`);
+        const indexKey = `${tableName}.${index.Key_name}`;
+        
+        // 如果这个索引还没有处理过
+        if (!processedIndexes.has(indexKey)) {
+          processedIndexes.add(indexKey);
+          
+          // 获取这个索引的所有列
+          const indexColumns = indexes
+            .filter(idx => idx.Key_name === index.Key_name && idx.Table === tableName)
+            .sort((a, b) => a.Seq_in_index - b.Seq_in_index)
+            .map(idx => `\`${idx.Column_name}\``)
+            .join(', ');
+          
+          // 生成正确的索引创建语句
+          structure.push(`CREATE INDEX \`${index.Key_name}\` ON \`${tableName}\` (${indexColumns});`);
+        }
       }
     }
   }
