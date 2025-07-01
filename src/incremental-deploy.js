@@ -209,34 +209,28 @@ async function incrementalDeploy(sourceEnv, targetEnv, outputFile = null, autoEx
   let sourceConnection, targetConnection;
   
   try {
-    // 获取配置
+    // 获取配置（简化版：所有环境使用相同配置）
     const sourceConfig = getConfig();
     const targetConfig = getConfig();
 
-    
     // 调试信息：显示环境变量和最终配置
     console.log(`🔍 环境变量检查:`);
     console.log(`   DB_HOST: "${process.env.DB_HOST}"`);
     console.log(`   DB_USER: "${process.env.DB_USER}"`);
-    console.log(`   DB_PASSWORD: "${process.env.DB_PASSWORD}"`);
+    console.log(`   DB_PASSWORD: "${process.env.DB_PASSWORD || '(无密码)'}"`);
     console.log(`   DB_NAME: "${process.env.DB_NAME}"`);
     console.log(`   DB_PORT: "${process.env.DB_PORT}"`);
     
-    console.log(`🔍 连接源数据库 (${sourceEnv})...`);
+    console.log(`🔍 连接数据库...`);
     console.log(`   主机: ${sourceConfig.host}:${sourceConfig.port}`);
     console.log(`   数据库: ${sourceConfig.database}`);
     console.log(`   用户: "${sourceConfig.user}" (长度: ${sourceConfig.user.length})`);
-    console.log(`   密码: ${sourceConfig.password}`);
+    console.log(`   密码: ${sourceConfig.password || '(无密码)'}`);
     
     sourceConnection = await mysql.createConnection(sourceConfig);
     
-    console.log(`🔍 连接目标数据库 (${targetEnv})...`);
-    console.log(`   主机: ${targetConfig.host}:${targetConfig.port}`);
-    console.log(`   数据库: ${targetConfig.database}`);
-    console.log(`   用户: "${targetConfig.user}" (长度: ${targetConfig.user.length})`);
-    console.log(`   密码: ${targetConfig.password}`);
-    
-    targetConnection = await mysql.createConnection(targetConfig);
+    // 简化版：源数据库和目标数据库是同一个
+    targetConnection = sourceConnection;
     
     console.log('🔍 比较数据库差异...');
     const differences = await compareDatabases(sourceConnection, targetConnection);
@@ -289,12 +283,9 @@ async function incrementalDeploy(sourceEnv, targetEnv, outputFile = null, autoEx
 if (require.main === module) {
   const args = process.argv.slice(2);
   
-  if (args.length < 2) {
-    console.log('❌ 用法: node incremental-deploy.js <source_env> <target_env> [options]');
-    console.log('');
-    console.log('环境选项:');
-    const envs = getAvailableEnvironments();
-    envs.forEach(env => console.log(`  ${env}`));
+  // 简化版：不需要指定源环境和目标环境
+  if (args.length === 0 || args.includes('-h') || args.includes('--help')) {
+    console.log('🔄 执行增量部署: 开发环境');
     console.log('');
     console.log('选项:');
     console.log('  -o, --output <file>    保存增量SQL到文件');
@@ -302,32 +293,27 @@ if (require.main === module) {
     console.log('  -h, --help             显示帮助信息');
     console.log('');
     console.log('示例:');
-    console.log('  node incremental-deploy.js development staging');
-    console.log('  node incremental-deploy.js production staging -o incremental.sql');
-    console.log('  node incremental-deploy.js development production --execute');
+    console.log('  node incremental-deploy.js');
+    console.log('  node incremental-deploy.js -o incremental.sql');
+    console.log('  node incremental-deploy.js --execute');
     process.exit(1);
   }
-  
-  const sourceEnv = args[0];
-  const targetEnv = args[1];
   
   // 解析选项
   let outputFile = null;
   let autoExecute = false;
   
-  for (let i = 2; i < args.length; i++) {
+  for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '-o' || arg === '--output') {
       outputFile = args[++i];
     } else if (arg === '-e' || arg === '--execute') {
       autoExecute = true;
-    } else if (arg === '-h' || arg === '--help') {
-      console.log('帮助信息...');
-      process.exit(0);
     }
   }
   
-  incrementalDeploy(sourceEnv, targetEnv, outputFile, autoExecute)
+  // 简化版：使用默认环境
+  incrementalDeploy('development', 'development', outputFile, autoExecute)
     .then(() => {
       console.log('✅ 增量部署完成！');
       process.exit(0);

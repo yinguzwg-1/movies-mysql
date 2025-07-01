@@ -5,7 +5,13 @@
   "main": "src/export.js",
   "scripts": {
     "export": "node src/export.js export -d nest_db",
-    "start": "node src/export.js export -d nest_db"
+    "start": "node src/export.js export -d nest_db",
+    "deploy": "node src/incremental-deploy.js",
+    "deploy:execute": "node src/incremental-deploy.js --execute",
+    "deploy:output": "node src/incremental-deploy.js -o incremental.sql",
+    "quick-start": "node start.js",
+    "test": "node test-connection.js",
+    "setup": "node setup.js"
   },
   "keywords": [
     "mysql",
