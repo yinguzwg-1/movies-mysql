@@ -9,6 +9,14 @@ on:
       - '.env'
   workflow_dispatch:
     inputs:
+      deploy_type:
+        description: '部署类型'
+        required: true
+        default: 'incremental'
+        type: choice
+        options:
+          - incremental
+          - full
       auto_execute:
         description: '是否自动执行部署'
         required: true
@@ -41,10 +49,12 @@ jobs:
 
     - name: 🔍 检查部署配置
       run: |
+        DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'incremental' }}"
         AUTO_EXECUTE="${{ github.event.inputs.auto_execute || 'true' }}"
         OUTPUT_FILE="${{ github.event.inputs.output_file || '' }}"
         
-        echo "🚀 增量部署配置:"
+        echo "🚀 部署配置:"
+        echo "📤 部署类型: $DEPLOY_TYPE"
         echo "📤 自动执行: $AUTO_EXECUTE"
         if [ -n "$OUTPUT_FILE" ]; then
           echo "📥 输出文件: $OUTPUT_FILE"
@@ -107,8 +117,9 @@ jobs:
         port: ${{ secrets.ALIYUN_PORT || '22' }}
         command_timeout: "600s"
         script: |
-          echo "🔄 执行增量部署..."
+          echo "🔄 执行部署..."
           
+          DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'incremental' }}"
           AUTO_EXECUTE="${{ github.event.inputs.auto_execute || 'true' }}"
           OUTPUT_FILE="${{ github.event.inputs.output_file || '' }}"
           
@@ -146,19 +157,45 @@ jobs:
           echo "   DB_NAME: $DB_NAME"
           echo "   DB_PORT: $DB_PORT"
           
-          # 构建部署命令
-          DEPLOY_CMD="node src/incremental-deploy.js"
-          
-          if [ "$AUTO_EXECUTE" = "true" ]; then
-            DEPLOY_CMD="$DEPLOY_CMD --execute"
+          # 根据部署类型执行不同的命令
+          if [ "$DEPLOY_TYPE" = "full" ]; then
+            echo "🔄 执行完整部署..."
+            
+            # 检查database.sql文件是否存在
+            if [ -f "database.sql" ]; then
+              echo "✅ 找到database.sql文件，执行完整部署"
+              
+              # 执行完整SQL文件
+              mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" < database.sql
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ 完整部署执行成功"
+              else
+                echo "❌ 完整部署执行失败"
+                exit 1
+              fi
+            else
+              echo "❌ 未找到database.sql文件"
+              exit 1
+            fi
+            
+          else
+            echo "🔄 执行增量部署..."
+            
+            # 构建增量部署命令
+            DEPLOY_CMD="node src/incremental-deploy.js"
+            
+            if [ "$AUTO_EXECUTE" = "true" ]; then
+              DEPLOY_CMD="$DEPLOY_CMD --execute"
+            fi
+            
+            if [ -n "$OUTPUT_FILE" ]; then
+              DEPLOY_CMD="$DEPLOY_CMD -o $OUTPUT_FILE"
+            fi
+            
+            echo "🚀 执行命令: $DEPLOY_CMD"
+            $DEPLOY_CMD
           fi
-          
-          if [ -n "$OUTPUT_FILE" ]; then
-            DEPLOY_CMD="$DEPLOY_CMD -o $OUTPUT_FILE"
-          fi
-          
-          echo "🚀 执行命令: $DEPLOY_CMD"
-          $DEPLOY_CMD
           
           # 检查部署结果
           if [ $? -ne 0 ]; then
