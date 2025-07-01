@@ -210,12 +210,9 @@ async function incrementalDeploy(sourceEnv, targetEnv, outputFile = null, autoEx
   
   try {
     // 获取配置
-    const sourceConfig = getConfig(sourceEnv);
-    const targetConfig = getConfig(targetEnv);
-    
-    // 验证配置
-    validateConfig(sourceConfig);
-    validateConfig(targetConfig);
+    const sourceConfig = getConfig();
+    const targetConfig = getConfig();
+
     
     // 调试信息：显示环境变量和最终配置
     console.log(`🔍 环境变量检查:`);
