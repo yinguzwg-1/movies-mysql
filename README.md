@@ -37,6 +37,8 @@ DB_NAME=nest_db
 DB_PORT=3306
 ```
 
+**注意**: 如果你的数据库已经配置好并且可以正常连接，这个步骤是可选的。
+
 ### 2. 安装依赖
 
 ```bash
@@ -114,8 +116,29 @@ node src/incremental-deploy.js --help
 - `src/incremental-deploy.js`: 主要的增量部署脚本
 - `src/db-config.js`: 数据库配置文件（已简化）
 
+## GitHub Actions 自动部署
+
+本项目支持通过GitHub Actions自动部署到阿里云服务器。
+
+### 配置步骤
+
+1. **配置GitHub Secrets**
+   - 参考 [GitHub Secrets 配置说明](./GITHUB_SECRETS_SETUP.md)
+   - 主要需要配置阿里云服务器的SSH连接信息
+   - 数据库配置是可选的（如果.env文件已配置）
+
+2. **触发部署**
+   - 推送代码到 `main` 分支自动触发
+   - 或手动触发：Actions → 选择工作流 → Run workflow
+
+### 部署选项
+
+- **自动执行**: 是否自动执行SQL变更
+- **输出文件**: 可选的SQL文件输出路径
+
 ## 注意事项
 
 - 确保云服务器数据库服务正在运行
 - 确保网络连接正常
-- 建议在部署前备份数据库 
+- 建议在部署前备份数据库
+- 确保GitHub Secrets配置正确 

@@ -1,3 +1,6 @@
+// 加载环境变量
+require('dotenv').config();
+
 // 数据库配置文件 - 简化版，只支持开发环境
 const config = {
   host: process.env.DB_HOST || 'localhost',
