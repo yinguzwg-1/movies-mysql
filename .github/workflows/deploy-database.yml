@@ -12,11 +12,11 @@ on:
       deploy_type:
         description: '部署类型'
         required: true
-        default: 'incremental'
+        default: 'full'
         type: choice
         options:
-          - incremental
           - full
+          - incremental
       auto_execute:
         description: '是否自动执行部署'
         required: true
@@ -49,7 +49,7 @@ jobs:
 
     - name: 🔍 检查部署配置
       run: |
-        DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'incremental' }}"
+        DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'full' }}"
         AUTO_EXECUTE="${{ github.event.inputs.auto_execute || 'true' }}"
         OUTPUT_FILE="${{ github.event.inputs.output_file || '' }}"
         
@@ -119,7 +119,7 @@ jobs:
         script: |
           echo "🔄 执行部署..."
           
-          DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'incremental' }}"
+          DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'full' }}"
           AUTO_EXECUTE="${{ github.event.inputs.auto_execute || 'true' }}"
           OUTPUT_FILE="${{ github.event.inputs.output_file || '' }}"
           
@@ -183,7 +183,8 @@ jobs:
             echo "🔄 执行增量部署..."
             
             # 构建增量部署命令
-            DEPLOY_CMD="node src/incremental-deploy.js"
+            # 比较 database.sql 文件与生产数据库的差异
+            DEPLOY_CMD="node src/incremental-deploy.js production database.sql"
             
             if [ "$AUTO_EXECUTE" = "true" ]; then
               DEPLOY_CMD="$DEPLOY_CMD --execute"

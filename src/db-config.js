@@ -1,25 +1,46 @@
 // 加载环境变量
 require('dotenv').config();
 
-// 数据库配置文件 - 简化版，只支持开发环境
-const config = {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '', // 云服务器数据库无密码
-  database: process.env.DB_NAME || 'nest_db',
-  charset: 'utf8mb4',
-  port: process.env.DB_PORT || 3306
+// 数据库配置文件
+const configs = {
+  development: {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'nest_db',
+    charset: 'utf8mb4',
+    port: process.env.DB_PORT || 3306
+  },
+  production: {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'nest_db',
+    charset: 'utf8mb4',
+    port: process.env.DB_PORT || 3306
+  },
+  staging: {
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'nest_db',
+    charset: 'utf8mb4',
+    port: process.env.DB_PORT || 3306
+  }
 };
 
 // 获取配置
 function getConfig(environment = 'development') {
-  // 简化版：所有环境都使用相同配置
+  const config = configs[environment];
+  if (!config) {
+    throw new Error(`未知的环境: ${environment}`);
+  }
   return config;
 }
 
 // 获取所有可用的环境
 function getAvailableEnvironments() {
-  return ['development'];
+  return Object.keys(configs);
 }
 
 // 验证配置
@@ -38,5 +59,5 @@ module.exports = {
   getConfig,
   getAvailableEnvironments,
   validateConfig,
-  configs: { development: config }
+  configs
 }; 
