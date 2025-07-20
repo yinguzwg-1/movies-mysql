@@ -26,16 +26,28 @@ async function processSQLFile(inputFile, outputFile) {
         continue;
       }
       
-      currentStatement += line + '\n';
-      
-      // 检查是否是多行语句的开始
+      // 检查是否是新语句的开始
       if (trimmedLine.startsWith('CREATE TABLE') || 
           trimmedLine.startsWith('INSERT INTO') || 
           trimmedLine.startsWith('DROP TABLE') ||
           trimmedLine.startsWith('ALTER TABLE') ||
           trimmedLine.startsWith('UPDATE') ||
-          trimmedLine.startsWith('DELETE FROM')) {
+          trimmedLine.startsWith('DELETE FROM') ||
+          trimmedLine.startsWith('CREATE DATABASE') ||
+          trimmedLine.startsWith('USE ') ||
+          trimmedLine.startsWith('SET ')) {
+        
+        // 如果当前有未完成的语句，先保存它
+        if (currentStatement.trim()) {
+          statements.push(currentStatement.trim());
+        }
+        
+        // 开始新语句
+        currentStatement = line + '\n';
         inStatement = true;
+      } else {
+        // 继续当前语句
+        currentStatement += line + '\n';
       }
       
       // 检查语句是否结束
@@ -44,6 +56,11 @@ async function processSQLFile(inputFile, outputFile) {
         currentStatement = '';
         inStatement = false;
       }
+    }
+    
+    // 添加最后一个语句（如果有的话）
+    if (currentStatement.trim()) {
+      statements.push(currentStatement.trim());
     }
     
     // 过滤空语句
@@ -59,8 +76,9 @@ async function processSQLFile(inputFile, outputFile) {
         
         // 如果还没有 IF NOT EXISTS，则添加
         if (!trimmedStmt.includes('IF NOT EXISTS')) {
+          // 更精确的正则表达式，匹配 CREATE TABLE `table_name` 格式
           processedStmt = trimmedStmt.replace(
-            /CREATE TABLE `?([^`\s(]+)`?/i,
+            /CREATE TABLE\s+`([^`]+)`/i,
             'CREATE TABLE IF NOT EXISTS `$1`'
           );
         }
