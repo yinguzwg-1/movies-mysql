@@ -165,15 +165,30 @@ jobs:
             if [ -f "database.sql" ]; then
               echo "✅ 找到database.sql文件，执行完整部署"
               
-              # 执行完整SQL文件
-              mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" < database.sql
+              # 使用 Node.js 脚本处理 SQL 文件
+              echo "📝 处理 SQL 文件以支持已存在的表..."
+              node src/process-sql.js database.sql database_safe.sql
               
               if [ $? -eq 0 ]; then
-                echo "✅ 完整部署执行成功"
+                echo "✅ SQL 文件处理成功"
+                
+                # 执行处理后的SQL文件
+                mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" < database_safe.sql
+                
+                if [ $? -eq 0 ]; then
+                  echo "✅ 完整部署执行成功"
+                  echo "📊 已使用 IF NOT EXISTS 和 IGNORE 选项处理重复表和数据"
+                else
+                  echo "❌ 完整部署执行失败"
+                  exit 1
+                fi
               else
-                echo "❌ 完整部署执行失败"
+                echo "❌ SQL 文件处理失败"
                 exit 1
               fi
+              
+              # 清理临时文件
+              rm -f database_safe.sql
             else
               echo "❌ 未找到database.sql文件"
               exit 1

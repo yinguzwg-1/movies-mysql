@@ -140,7 +140,7 @@ full_deploy() {
     print_info "完整部署: $source_env -> $target_env"
     
     if [ "$force" != "true" ]; then
-        print_warning "完整部署将覆盖目标数据库的所有数据！"
+        print_warning "完整部署将使用 IF NOT EXISTS 和 IGNORE 选项，安全地更新数据库！"
         read -p "确认继续吗？(y/N): " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -149,17 +149,24 @@ full_deploy() {
         fi
     fi
     
-    # 导出源数据库
-    local temp_file="temp_export_$(date +%Y%m%d_%H%M%S).sql"
-    print_info "导出源数据库..."
-    node src/export.js export -o "$temp_file"
+    # 检查 database.sql 文件是否存在
+    if [ ! -f "database.sql" ]; then
+        print_error "未找到 database.sql 文件"
+        exit 1
+    fi
+    
+    print_info "处理 SQL 文件以支持已存在的表..."
+    
+    # 使用 Node.js 脚本处理 SQL 文件
+    local processed_file="database_safe_$(date +%Y%m%d_%H%M%S).sql"
+    node src/process-sql.js database.sql "$processed_file"
     
     # 导入到目标数据库
     print_info "导入到目标数据库..."
-    node src/export.js import -i "$temp_file"
+    node src/export.js import -i "$processed_file"
     
     # 清理临时文件
-    rm -f "$temp_file"
+    rm -f "$processed_file"
     
     print_success "完整部署完成"
 }
