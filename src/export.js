@@ -190,7 +190,29 @@ async function getDatabaseData(connection) {
       const values = rows.map(row => {
         const rowValues = columnNames.map((col, index) => {
           const value = row[col];
+          const columnType = columnTypes[index];
+          
           if (value === null) return 'NULL';
+          
+          // 处理JSON类型
+          if (columnType && columnType.toLowerCase().includes('json')) {
+            if (typeof value === 'object' && value !== null) {
+              // 如果是对象，转换为JSON字符串
+              return `'${JSON.stringify(value).replace(/'/g, "''").replace(/\\/g, "\\\\")}'`;
+            } else if (typeof value === 'string') {
+              // 如果已经是字符串，检查是否是有效的JSON
+              try {
+                JSON.parse(value);
+                return `'${value.replace(/'/g, "''").replace(/\\/g, "\\\\")}'`;
+              } catch (e) {
+                // 如果不是有效JSON，直接返回字符串
+                return `'${value.replace(/'/g, "''").replace(/\\/g, "\\\\")}'`;
+              }
+            } else {
+              // 其他类型转换为JSON字符串
+              return `'${JSON.stringify(value).replace(/'/g, "''").replace(/\\/g, "\\\\")}'`;
+            }
+          }
           
           // 处理日期时间类型
           if (value instanceof Date) {
