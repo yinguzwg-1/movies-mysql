@@ -197,20 +197,71 @@ jobs:
           else
             echo "🔄 执行增量部署..."
             
-            # 构建增量部署命令
-            # 比较 database.sql 文件与生产数据库的差异
-            DEPLOY_CMD="node src/incremental-deploy.js production database.sql"
+            # 首先导出当前云端数据库结构到临时文件
+            echo "📤 导出云端数据库结构..."
+            node src/export.js export -o cloud_database_structure.sql -s
             
-            if [ "$AUTO_EXECUTE" = "true" ]; then
-              DEPLOY_CMD="$DEPLOY_CMD --execute"
+            if [ $? -ne 0 ]; then
+              echo "❌ 导出云端数据库结构失败"
+              exit 1
             fi
             
-            if [ -n "$OUTPUT_FILE" ]; then
-              DEPLOY_CMD="$DEPLOY_CMD -o $OUTPUT_FILE"
+            # 使用 compare 命令对比本地 SQL 文件与云端数据库结构
+            echo "🔍 对比本地SQL文件与云端数据库结构..."
+            
+            # 设置环境变量用于连接云端数据库
+            export LOCAL_DB_HOST="$DB_HOST"
+            export LOCAL_DB_PORT="$DB_PORT"
+            export LOCAL_DB_USER="$DB_USER"
+            export LOCAL_DB_PASSWORD="$DB_PASSWORD"
+            export LOCAL_DB_NAME="$DB_NAME"
+            
+            # 使用 compare 命令对比本地SQL文件与云端数据库字段差异
+            echo "🔍 开始对比本地SQL文件与云端数据库字段差异..."
+            node src/export.js compare -f database.sql -t "$DB_NAME" -o field_updates.sql
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ 字段对比完成"
+              
+              # 检查是否生成了更新脚本
+              if [ -f "field_updates.sql" ]; then
+                # 检查是否有字段差异
+                if grep -q "没有发现字段差异" field_updates.sql; then
+                  echo "✅ 没有发现字段差异，无需更新"
+                else
+                  echo "📝 发现字段差异，生成更新脚本"
+                  
+                  # 如果设置了自动执行，则执行更新脚本
+                  if [ "$AUTO_EXECUTE" = "true" ]; then
+                    echo "🚀 自动执行字段更新..."
+                    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" < field_updates.sql
+                    
+                    if [ $? -eq 0 ]; then
+                      echo "✅ 字段更新执行成功"
+                    else
+                      echo "❌ 字段更新执行失败"
+                      exit 1
+                    fi
+                  else
+                    echo "📋 字段更新脚本已生成，请手动执行: field_updates.sql"
+                  fi
+                fi
+              else
+                echo "❌ 未生成字段更新脚本"
+                exit 1
+              fi
+            else
+              echo "❌ 字段对比失败"
+              exit 1
             fi
             
-            echo "🚀 执行命令: $DEPLOY_CMD"
-            $DEPLOY_CMD
+            if [ $? -ne 0 ]; then
+              echo "❌ 增量部署执行失败"
+              exit 1
+            fi
+            
+            # 清理临时文件
+            rm -f cloud_database_structure.sql field_updates.sql
           fi
           
           # 检查部署结果
@@ -253,10 +304,14 @@ jobs:
               });
           "
           
-          echo "🎉 增量部署完成！"
+          echo "🎉 部署完成！"
           echo "🌐 数据库地址: $DB_HOST:$DB_PORT"
           echo "📊 数据库名称: $DB_NAME"
-          echo "🔧 部署类型: incremental"
+          if [ "$DEPLOY_TYPE" = "full" ]; then
+            echo "🔧 部署类型: 完整部署"
+          else
+            echo "🔧 部署类型: 增量部署（字段对比）"
+          fi
 
     - name: 🔄 重启应用
       uses: appleboy/ssh-action@v1.0.3
