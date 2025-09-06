@@ -38,10 +38,10 @@ jobs:
     - name: 📥 检出代码
       uses: actions/checkout@v4
 
-    - name: 🟢 设置 Node.js
+    - name: 🟢 设置 Node.js 16
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '16'
         cache: 'npm'
 
     - name: 📦 安装依赖
@@ -73,11 +73,18 @@ jobs:
           
           # 检查 Node.js 是否安装
           if ! command -v node &> /dev/null; then
-            echo "📦 安装 Node.js..."
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            echo "📦 安装 Node.js 16..."
+            curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
             sudo apt-get install -y nodejs
           else
             echo "✅ Node.js 已安装: $(node --version)"
+            # 检查版本是否为16.x，如果不是则重新安装
+            NODE_VERSION=$(node --version | cut -d'.' -f1 | sed 's/v//')
+            if [ "$NODE_VERSION" -ne 16 ]; then
+              echo "⚠️ 当前Node.js版本不是16.x，重新安装Node.js 16..."
+              curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            fi
           fi
           
           # 检查 MySQL 是否安装
