@@ -328,7 +328,7 @@ function generateSqlContent(structure, data, databaseName, structureOnly = false
   ].join('\n');
 }
 
-// 对比SQL文件与数据库结构
+// 对比SQL文件与数据库结构（使用 INFORMATION_SCHEMA 直接查询，更可靠）
 async function compareSqlFileWithDatabase(sqlFile, targetDb, outputFile) {
   const spinner = ora('正在对比SQL文件与数据库字段差异...').start();
   
@@ -356,26 +356,125 @@ async function compareSqlFileWithDatabase(sqlFile, targetDb, outputFile) {
     console.log(chalk.blue(`📄 SQL文件: ${sqlFile}`));
     console.log(chalk.blue(`📊 目标数据库: ${targetDb}`));
     
-    // 连接数据库
+    // ---- 1. 从服务器获取当前表结构（通过 INFORMATION_SCHEMA，最准确） ----
     spinner.text = '正在连接数据库...';
     const connection = await mysql.createConnection(config);
     
-    // 获取目标数据库结构
-    spinner.text = '正在获取目标数据库表结构...';
-    await connection.query(`USE \`${targetDb}\``);
-    const targetStructure = await getDatabaseStructure(connection);
+    spinner.text = '正在查询服务器表结构...';
+    const [serverColumns] = await connection.query(
+      `SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA, ORDINAL_POSITION
+       FROM INFORMATION_SCHEMA.COLUMNS 
+       WHERE TABLE_SCHEMA = ?
+       ORDER BY TABLE_NAME, ORDINAL_POSITION`,
+      [targetDb]
+    );
     
-    // 关闭连接
+    const [serverTables] = await connection.query(
+      `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'`,
+      [targetDb]
+    );
+    
     await connection.end();
     
-    // 解析SQL文件结构
+    // 构建服务器表结构 Map：tableName -> [{ name, type, nullable, default, extra }]
+    const serverTableMap = {};
+    for (const tbl of serverTables) {
+      serverTableMap[tbl.TABLE_NAME] = [];
+    }
+    for (const col of serverColumns) {
+      if (!serverTableMap[col.TABLE_NAME]) serverTableMap[col.TABLE_NAME] = [];
+      serverTableMap[col.TABLE_NAME].push({
+        name: col.COLUMN_NAME,
+        type: col.COLUMN_TYPE,
+        nullable: col.IS_NULLABLE === 'YES',
+        defaultVal: col.COLUMN_DEFAULT,
+        extra: col.EXTRA,
+        position: col.ORDINAL_POSITION,
+      });
+    }
+    
+    console.log(chalk.blue(`📊 服务器表: ${Object.keys(serverTableMap).join(', ')}`));
+    for (const [tbl, cols] of Object.entries(serverTableMap)) {
+      console.log(chalk.gray(`   ${tbl}: ${cols.map(c => c.name).join(', ')}`));
+    }
+    
+    // ---- 2. 从 SQL 文件解析表结构 ----
     spinner.text = '正在解析SQL文件结构...';
     const sqlContent = fs.readFileSync(sqlFile, 'utf8');
-    const sourceStructure = parseSqlFileStructure(sqlContent);
+    const localTableMap = parseSqlFileColumns(sqlContent);
     
-    // 生成更新脚本
-    spinner.text = '正在生成字段更新脚本...';
-    const updateScript = generateUpdateScript(sourceStructure, targetStructure, targetDb);
+    console.log(chalk.blue(`📄 本地表: ${Object.keys(localTableMap).join(', ')}`));
+    for (const [tbl, cols] of Object.entries(localTableMap)) {
+      console.log(chalk.gray(`   ${tbl}: ${cols.map(c => c.name).join(', ')}`));
+    }
+    
+    // ---- 3. 生成增量更新 SQL ----
+    spinner.text = '正在生成更新脚本...';
+    const updates = [];
+    let hasChanges = false;
+    
+    for (const [tableName, localColumns] of Object.entries(localTableMap)) {
+      if (!serverTableMap[tableName]) {
+        // 新表：从 SQL 文件提取完整 CREATE TABLE 语句
+        updates.push(`-- 新增表: ${tableName}`);
+        const createStmt = extractCreateTable(sqlContent, tableName);
+        if (createStmt) {
+          const safeStmt = createStmt.replace(
+            /CREATE TABLE\s+`/i,
+            'CREATE TABLE IF NOT EXISTS `'
+          );
+          updates.push(safeStmt);
+        } else {
+          updates.push(`-- 警告: 无法从 SQL 文件提取 ${tableName} 的建表语句`);
+        }
+        updates.push('');
+        hasChanges = true;
+        continue;
+      }
+      
+      // 表已存在，对比字段
+      const serverColumns = serverTableMap[tableName];
+      const serverColMap = new Map(serverColumns.map(c => [c.name, c]));
+      
+      let prevColName = null;
+      for (const localCol of localColumns) {
+        if (!serverColMap.has(localCol.name)) {
+          // 新增字段
+          const afterClause = prevColName ? ` AFTER \`${prevColName}\`` : ' FIRST';
+          updates.push(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${localCol.name}\` ${localCol.fullDef}${afterClause};`);
+          hasChanges = true;
+        }
+        prevColName = localCol.name;
+      }
+      
+      // 检查服务器有但本地没有的字段（只提示，不自动删除）
+      const localColNames = new Set(localColumns.map(c => c.name));
+      for (const srvCol of serverColumns) {
+        if (!localColNames.has(srvCol.name)) {
+          updates.push(`-- 注意: 字段 \`${tableName}\`.\`${srvCol.name}\` 仅存在于服务器（未自动删除）`);
+        }
+      }
+    }
+    
+    if (!hasChanges) {
+      updates.push('-- 没有发现字段差异');
+    }
+    
+    const timestamp = new Date().toISOString();
+    const updateScript = [
+      `-- 数据库增量更新脚本`,
+      `-- 创建时间: ${timestamp}`,
+      `-- 目标数据库: ${targetDb}`,
+      `-- 注意: 此脚本只处理 Schema 差异，不操作数据`,
+      '',
+      'SET FOREIGN_KEY_CHECKS = 0;',
+      '',
+      `USE \`${targetDb}\`;`,
+      '',
+      ...updates,
+      '',
+      'SET FOREIGN_KEY_CHECKS = 1;',
+    ].join('\n');
     
     // 确保输出目录存在
     const outputDir = path.dirname(outputFile);
@@ -387,12 +486,11 @@ async function compareSqlFileWithDatabase(sqlFile, targetDb, outputFile) {
     fs.writeFileSync(outputFile, updateScript, 'utf8');
     
     spinner.succeed(chalk.green('✅ SQL文件与数据库字段对比完成！'));
-    console.log(chalk.blue(`📁 字段更新脚本位置: ${path.resolve(outputFile)}`));
-    
-    // 显示文件信息
-    const stats = fs.statSync(outputFile);
-    const fileSize = (stats.size / 1024).toFixed(2);
-    console.log(chalk.blue(`📊 文件大小: ${fileSize} KB`));
+    console.log(chalk.blue(`📁 字段更新脚本: ${path.resolve(outputFile)}`));
+    console.log(chalk.blue(`📊 文件大小: ${(fs.statSync(outputFile).size / 1024).toFixed(2)} KB`));
+    if (hasChanges) {
+      console.log(chalk.yellow(`⚡ 发现 ${updates.filter(u => u.startsWith('ALTER') || u.startsWith('CREATE')).length} 项变更`));
+    }
     
   } catch (error) {
     spinner.fail(chalk.red('❌ 对比失败'));
@@ -400,39 +498,90 @@ async function compareSqlFileWithDatabase(sqlFile, targetDb, outputFile) {
   }
 }
 
-// 解析SQL文件结构
-function parseSqlFileStructure(sqlContent) {
-  const structure = [];
+/**
+ * 从 SQL 文件内容解析每张表的列定义
+ * 返回: { tableName: [{ name, fullDef }] }
+ * 
+ * 直接逐行解析，不依赖复杂的正则拼接
+ */
+function parseSqlFileColumns(sqlContent) {
+  const tables = {};
   const lines = sqlContent.split('\n');
   
-  let inCreateTable = false;
-  let currentTable = '';
+  let currentTable = null;
+  let currentColumns = [];
   
   for (const line of lines) {
-    const trimmedLine = line.trim();
+    const trimmed = line.trim();
     
     // 跳过注释和空行
-    if (trimmedLine.startsWith('--') || trimmedLine === '') {
+    if (!trimmed || trimmed.startsWith('--')) continue;
+    
+    // 检测 CREATE TABLE 开始
+    const createMatch = trimmed.match(/^CREATE TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`([^`]+)`/i);
+    if (createMatch) {
+      currentTable = createMatch[1];
+      currentColumns = [];
       continue;
     }
     
-    // 检查是否是CREATE TABLE语句
-    if (trimmedLine.toUpperCase().startsWith('CREATE TABLE')) {
-      inCreateTable = true;
-      currentTable = trimmedLine;
-    } else if (inCreateTable) {
-      currentTable += ' ' + trimmedLine;
+    // 在 CREATE TABLE 内部
+    if (currentTable) {
+      // 检测结束行: ) ENGINE=... 或 ) DEFAULT ...
+      if (/^\)\s*(ENGINE|DEFAULT|;)/i.test(trimmed)) {
+        tables[currentTable] = currentColumns;
+        currentTable = null;
+        currentColumns = [];
+        continue;
+      }
       
-      // 检查是否到达语句结束
-      if (trimmedLine.endsWith(';')) {
-        structure.push(currentTable);
-        inCreateTable = false;
-        currentTable = '';
+      // 跳过约束和索引行
+      if (/^(PRIMARY\s+KEY|UNIQUE\s+KEY|KEY\s+`|CONSTRAINT\s+|INDEX\s+|FULLTEXT\s+|SPATIAL\s+)/i.test(trimmed)) {
+        continue;
+      }
+      
+      // 解析列定义: `columnName` type ...
+      const colMatch = trimmed.match(/^`([^`]+)`\s+(.+?)[\s,]*$/);
+      if (colMatch) {
+        currentColumns.push({
+          name: colMatch[1],
+          fullDef: colMatch[2].replace(/,\s*$/, '').trim(),
+        });
       }
     }
   }
   
-  return structure;
+  return tables;
+}
+
+/**
+ * 从 SQL 文件中提取指定表的完整 CREATE TABLE 语句
+ */
+function extractCreateTable(sqlContent, tableName) {
+  const lines = sqlContent.split('\n');
+  let capturing = false;
+  let stmt = '';
+  
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('--')) continue;
+    
+    const regex = new RegExp(`^CREATE TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+\`${tableName}\``, 'i');
+    if (regex.test(trimmed)) {
+      capturing = true;
+      stmt = line + '\n';
+      continue;
+    }
+    
+    if (capturing) {
+      stmt += line + '\n';
+      if (trimmed.endsWith(';')) {
+        return stmt.trim();
+      }
+    }
+  }
+  
+  return null;
 }
 
 // 对比数据库结构
@@ -721,6 +870,8 @@ module.exports = {
   exportDatabase,
   compareDatabases,
   compareSqlFileWithDatabase,
+  parseSqlFileColumns,
+  extractCreateTable,
   parseTableStructures,
   splitColumnDefinitions,
   compareTableFields,
