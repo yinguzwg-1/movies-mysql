@@ -41,11 +41,11 @@ program
   .option('-f, --file <sqlfile>', '本地SQL文件路径', 'database.sql')
   .action(async (options) => {
     try {
-      if (options.file && options.file !== 'database.sql') {
-        // 如果指定了SQL文件，则比较SQL文件与目标数据库
+      if (options.file) {
+        // 指定了 SQL 文件，比较 SQL 文件 schema 与目标数据库
         await compareSqlFileWithDatabase(options.file, options.target, options.output);
       } else {
-        // 否则比较两个数据库
+        // 未指定文件，比较两个活跃数据库
         await compareDatabases(options.source, options.target, options.output);
       }
     } catch (error) {
