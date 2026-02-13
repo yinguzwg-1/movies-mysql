@@ -513,7 +513,7 @@ function generateUpdateScript(sourceStructure, targetStructure, targetDb) {
   const updates = [];
   let hasChanges = false;
   
-  // 只对比两个数据库中都存在的表的字段差异
+  // 检查源中存在的表
   for (const [tableName, sourceTable] of Object.entries(sourceTables)) {
     if (targetTables[tableName]) {
       // 表在两个数据库中都存在，对比字段
@@ -526,16 +526,26 @@ function generateUpdateScript(sourceStructure, targetStructure, targetDb) {
         hasChanges = true;
       }
     } else {
-      // 源数据库中有但目标数据库中没有的表
-      updates.push(`-- 表 ${tableName} 在目标数据库中不存在，跳过字段对比`);
+      // 源中有但目标中没有的表 → 需要创建
+      updates.push(`-- 创建新表 ${tableName}`);
+      // 使用原始 CREATE TABLE 语句（添加 IF NOT EXISTS）
+      let createSql = sourceTable.createTable;
+      if (!createSql.includes('IF NOT EXISTS')) {
+        createSql = createSql.replace(
+          /CREATE TABLE\s+`/i,
+          'CREATE TABLE IF NOT EXISTS `'
+        );
+      }
+      updates.push(createSql);
       updates.push('');
+      hasChanges = true;
     }
   }
   
-  // 检查目标数据库中有但源数据库中没有的表
+  // 目标中有但源中没有的表 → 只记录，不删除（安全起见）
   for (const tableName of Object.keys(targetTables)) {
     if (!sourceTables[tableName]) {
-      updates.push(`-- 表 ${tableName} 在源数据库中不存在，跳过字段对比`);
+      updates.push(`-- 注意: 表 ${tableName} 仅存在于服务器，本地 schema 中不存在（未自动删除）`);
       updates.push('');
     }
   }
@@ -545,11 +555,10 @@ function generateUpdateScript(sourceStructure, targetStructure, targetDb) {
   }
   
   return [
-    `-- 数据库字段对比更新脚本`,
+    `-- 数据库增量更新脚本`,
     `-- 创建时间: ${timestamp}`,
-    `-- 源数据库: ${targetDb}`,
     `-- 目标数据库: ${targetDb}`,
-    `-- 注意: 此脚本只处理字段差异，不创建或删除表`,
+    `-- 注意: 此脚本只处理 Schema 差异（新增表、新增/修改字段），不操作数据`,
     '',
     'SET FOREIGN_KEY_CHECKS = 0;',
     'SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";',
@@ -557,7 +566,9 @@ function generateUpdateScript(sourceStructure, targetStructure, targetDb) {
     'START TRANSACTION;',
     'SET time_zone = "+00:00";',
     '',
-    '-- 字段更新',
+    `USE \`${targetDb}\`;`,
+    '',
+    '-- Schema 更新',
     '-- --------------------------------------------------------',
     '',
     ...updates,
@@ -567,96 +578,151 @@ function generateUpdateScript(sourceStructure, targetStructure, targetDb) {
   ].join('\n');
 }
 
-// 解析表结构
+/**
+ * 解析表结构 — 从 CREATE TABLE 语句数组中提取每张表的字段列表
+ * 
+ * 正确区分：
+ *   - 列定义：`fieldName` type ... (以反引号+类型开头)
+ *   - 约束/索引：PRIMARY KEY, KEY, UNIQUE KEY, CONSTRAINT (不是列)
+ */
 function parseTableStructures(structure) {
   const tables = {};
-  let currentTable = null;
   
-  for (const line of structure) {
-    if (line.startsWith('CREATE TABLE')) {
-      // 提取表名
-      const tableNameMatch = line.match(/CREATE TABLE `([^`]+)`/);
-      if (tableNameMatch) {
-        const tableName = tableNameMatch[1];
-        currentTable = {
-          name: tableName,
-          createTable: line,
-          fields: []
-        };
-        tables[tableName] = currentTable;
-        
-        // 解析字段定义
-        const fieldMatches = line.match(/`([^`]+)`\s+([^,\n]+)/g);
-        if (fieldMatches) {
-          fieldMatches.forEach(match => {
-            const fieldMatch = match.match(/`([^`]+)`\s+([^,\n]+)/);
-            if (fieldMatch) {
-              currentTable.fields.push({
-                name: fieldMatch[1],
-                definition: fieldMatch[2].trim()
-              });
-            }
-          });
-        }
+  for (const stmt of structure) {
+    // 只处理 CREATE TABLE 语句
+    const tableNameMatch = stmt.match(/CREATE TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`([^`]+)`/i);
+    if (!tableNameMatch) continue;
+    
+    const tableName = tableNameMatch[1];
+    
+    // 提取括号内的定义部分
+    // 从第一个 ( 到最后一个 ) （匹配 ENGINE= 之前的那个 )）
+    const bodyMatch = stmt.match(/\((.+)\)\s*(?:ENGINE|DEFAULT|;)/s);
+    if (!bodyMatch) continue;
+    
+    const body = bodyMatch[1];
+    
+    // 按逗号拆分各定义行，但要注意括号内的逗号不拆（如 CURRENT_TIMESTAMP(6)）
+    const definitions = splitColumnDefinitions(body);
+    
+    const fields = [];
+    for (const def of definitions) {
+      const trimmed = def.trim();
+      
+      // 跳过约束和索引行
+      if (/^(PRIMARY\s+KEY|UNIQUE\s+KEY|KEY\s+|CONSTRAINT\s+|INDEX\s+|FULLTEXT\s+|SPATIAL\s+)/i.test(trimmed)) {
+        continue;
+      }
+      
+      // 匹配列定义：`columnName` type...
+      const colMatch = trimmed.match(/^`([^`]+)`\s+(.+)$/);
+      if (colMatch) {
+        fields.push({
+          name: colMatch[1],
+          definition: colMatch[2].trim().replace(/,\s*$/, '')  // 去掉尾逗号
+        });
       }
     }
+    
+    tables[tableName] = {
+      name: tableName,
+      createTable: stmt,
+      fields
+    };
   }
   
   return tables;
 }
 
+/**
+ * 智能拆分 CREATE TABLE 内部的定义行
+ * 正确处理括号嵌套（如 CURRENT_TIMESTAMP(6)、FOREIGN KEY (userId) REFERENCES ...）
+ */
+function splitColumnDefinitions(body) {
+  const parts = [];
+  let current = '';
+  let depth = 0;
+  
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    
+    if (ch === ',' && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
+  
+  return parts;
+}
+
 // 对比表字段
 function compareTableFields(tableName, sourceTable, targetTable) {
   const updates = [];
-  const sourceFields = new Map(sourceTable.fields.map(f => [f.name, f]));
-  const targetFields = new Map(targetTable.fields.map(f => [f.name, f]));
   
-  // 检查需要添加的字段
-  for (const [fieldName, sourceField] of sourceFields) {
-    if (!targetFields.has(fieldName)) {
-      updates.push(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${fieldName}\` ${sourceField.definition};`);
+  // 保留顺序的字段列表
+  const sourceFields = sourceTable.fields;
+  const targetFieldMap = new Map(targetTable.fields.map(f => [f.name, f]));
+  const sourceFieldMap = new Map(sourceTable.fields.map(f => [f.name, f]));
+  
+  // 1. 检查需要添加或修改的字段
+  for (let i = 0; i < sourceFields.length; i++) {
+    const sourceField = sourceFields[i];
+    const fieldName = sourceField.name;
+    
+    if (!targetFieldMap.has(fieldName)) {
+      // 新字段 — 用 AFTER 确定位置
+      const afterClause = i > 0 ? ` AFTER \`${sourceFields[i - 1].name}\`` : ' FIRST';
+      updates.push(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${fieldName}\` ${sourceField.definition}${afterClause};`);
     } else {
-      // 字段存在，检查定义是否相同
-      const targetField = targetFields.get(fieldName);
-      if (sourceField.definition !== targetField.definition) {
+      // 字段已存在，对比定义是否变化（标准化后对比）
+      const targetField = targetFieldMap.get(fieldName);
+      if (normalizeDefinition(sourceField.definition) !== normalizeDefinition(targetField.definition)) {
         updates.push(`ALTER TABLE \`${tableName}\` MODIFY COLUMN \`${fieldName}\` ${sourceField.definition};`);
       }
     }
   }
   
-  // 检查需要删除的字段
-  for (const [fieldName, targetField] of targetFields) {
-    if (!sourceFields.has(fieldName)) {
-      updates.push(`ALTER TABLE \`${tableName}\` DROP COLUMN \`${fieldName}\`;`);
+  // 2. 检查需要删除的字段（仅提示，不自动删除，避免误删服务器数据）
+  for (const [fieldName] of targetFieldMap) {
+    if (!sourceFieldMap.has(fieldName)) {
+      updates.push(`-- 注意: 字段 \`${fieldName}\` 仅存在于服务器，本地 schema 中已移除（未自动删除，如需删除请手动执行）`);
+      // 注释掉实际的 DROP 语句，安全起见
+      updates.push(`-- ALTER TABLE \`${tableName}\` DROP COLUMN \`${fieldName}\`;`);
     }
   }
   
   return updates;
 }
 
-// 解析命令行参数
-const args = process.argv.slice(2);
-const command = args[0];
+/**
+ * 标准化字段定义字符串以进行对比
+ * 去除多余空格、统一大小写等
+ */
+function normalizeDefinition(def) {
+  return def
+    .replace(/\s+/g, ' ')           // 多个空格 → 一个
+    .replace(/\s*\(\s*/g, '(')      // ( 周围空格
+    .replace(/\s*\)\s*/g, ')')      // ) 周围空格
+    .replace(/,\s*$/, '')           // 尾逗号
+    .trim()
+    .toLowerCase();
+}
 
-// 默认输出文件名
-const defaultOutputFile = 'database.sql';
-
-if (command === 'export') {
-  const outputIndex = args.indexOf('-o');
-  const outputFile = outputIndex !== -1 ? args[outputIndex + 1] : defaultOutputFile;
-  
-  console.log('🚀 开始导出数据库...');
-  exportDatabase(outputFile);
-} else if (command === 'import') {
-  const inputIndex = args.indexOf('-i');
-  const inputFile = inputIndex !== -1 ? args[inputIndex + 1] : defaultOutputFile;
-  
-  console.log('🚀 开始导入数据库...');
-  importDatabase(inputFile);
-} else {
-  console.log('❌ 无效的命令');
-  console.log('用法:');
-  console.log('  node export.js export [-o output_file]');
-  console.log('  node export.js import [-i input_file]');
-  process.exit(1);
-} 
+// 模块导出（供其他脚本调用）
+module.exports = {
+  exportDatabase,
+  compareDatabases,
+  compareSqlFileWithDatabase,
+  parseTableStructures,
+  splitColumnDefinitions,
+  compareTableFields,
+  normalizeDefinition,
+}; 

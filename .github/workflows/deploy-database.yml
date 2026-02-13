@@ -1,22 +1,22 @@
-name: 🚀 数据库部署
+name: 🚀 数据库 Schema 部署
 
 on:
   push:
     branches: [ main, master ]
     paths:
+      - 'database.sql'
       - 'src/**'
       - '.github/workflows/deploy-database.yml'
-      - '.env'
   workflow_dispatch:
     inputs:
       deploy_type:
         description: '部署类型'
         required: true
-        default: 'full'
+        default: 'incremental'
         type: choice
         options:
-          - full
           - incremental
+          - full
       auto_execute:
         description: '是否自动执行部署'
         required: true
@@ -25,10 +25,6 @@ on:
         options:
           - 'true'
           - 'false'
-      output_file:
-        description: '输出SQL文件路径（可选）'
-        required: false
-        default: ''
 
 jobs:
   deploy-database:
@@ -38,72 +34,14 @@ jobs:
     - name: 📥 检出代码
       uses: actions/checkout@v4
 
-    - name: 🟢 设置 Node.js 16
-      uses: actions/setup-node@v4
-      with:
-        node-version: '16'
-        cache: 'npm'
-
-    - name: 📦 安装依赖
-      run: npm install
-
     - name: 🔍 检查部署配置
       run: |
-        DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'full' }}"
+        DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'incremental' }}"
         AUTO_EXECUTE="${{ github.event.inputs.auto_execute || 'true' }}"
-        OUTPUT_FILE="${{ github.event.inputs.output_file || '' }}"
         
         echo "🚀 部署配置:"
         echo "📤 部署类型: $DEPLOY_TYPE"
         echo "📤 自动执行: $AUTO_EXECUTE"
-        if [ -n "$OUTPUT_FILE" ]; then
-          echo "📥 输出文件: $OUTPUT_FILE"
-        fi
-
-    - name: 🚀 部署到阿里云服务器
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.ALIYUN_HOST }}
-        username: ${{ secrets.ALIYUN_USERNAME }}
-        key: ${{ secrets.ALIYUN_SSH_KEY }}
-        port: ${{ secrets.ALIYUN_PORT || '22' }}
-        command_timeout: "600s"
-        script: |
-          echo "🚀 开始增量部署数据库到阿里云服务器..."
-          
-          # 检查 Node.js 是否安装
-          if ! command -v node &> /dev/null; then
-            echo "📦 安装 Node.js 16..."
-            curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-          else
-            echo "✅ Node.js 已安装: $(node --version)"
-            # 检查版本是否为16.x，如果不是则重新安装
-            NODE_VERSION=$(node --version | cut -d'.' -f1 | sed 's/v//')
-            if [ "$NODE_VERSION" -ne 16 ]; then
-              echo "⚠️ 当前Node.js版本不是16.x，重新安装Node.js 16..."
-              curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
-              sudo apt-get install -y nodejs
-            fi
-          fi
-          
-          # 检查 MySQL 是否安装
-          if ! command -v mysql &> /dev/null; then
-            echo "📦 安装 MySQL..."
-            sudo apt-get update
-            sudo apt-get install -y mysql-server
-            sudo systemctl start mysql
-            sudo systemctl enable mysql
-          else
-            echo "✅ MySQL 已安装"
-            sudo systemctl start mysql || true
-          fi
-          
-          # 检查 MySQL 服务状态
-          echo "🔍 MySQL 服务状态:"
-          sudo systemctl status mysql --no-pager -l
-          
-          echo "✅ 服务器环境准备完成"
 
     - name: 📤 上传项目文件
       uses: appleboy/scp-action@v0.1.7
@@ -113,7 +51,8 @@ jobs:
         key: ${{ secrets.ALIYUN_SSH_KEY }}
         port: ${{ secrets.ALIYUN_PORT || '22' }}
         source: "./"
-        target: "/tmp/"
+        target: "/tmp/movies-mysql-deploy"
+        overwrite: true
 
     - name: 🔄 执行部署
       uses: appleboy/ssh-action@v1.0.3
@@ -126,199 +65,147 @@ jobs:
         script: |
           echo "🔄 执行部署..."
           
-          DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'full' }}"
+          DEPLOY_TYPE="${{ github.event.inputs.deploy_type || 'incremental' }}"
           AUTO_EXECUTE="${{ github.event.inputs.auto_execute || 'true' }}"
-          OUTPUT_FILE="${{ github.event.inputs.output_file || '' }}"
           
           # 进入项目目录
-          cd /tmp
+          cd /tmp/movies-mysql-deploy
+          
+          # 检查 Node.js
+          if ! command -v node &> /dev/null; then
+            echo "📦 安装 Node.js..."
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+          else
+            echo "✅ Node.js 已安装: $(node --version)"
+          fi
           
           # 安装依赖
           echo "📦 安装项目依赖..."
-          npm install
+          npm install --production
           
-          # 使用GitHub Secrets配置数据库连接
-          echo "🔍 使用GitHub Secrets配置数据库连接"
-          
-          # 设置环境变量
+          # 设置环境变量（从 GitHub Secrets）
           export DB_HOST="${{ secrets.DB_HOST }}"
           export DB_USER="${{ secrets.DB_USER }}"
           export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
           export DB_NAME="${{ secrets.DB_NAME }}"
           export DB_PORT="${{ secrets.DB_PORT || '3306' }}"
           
-          # 检查必要的环境变量是否设置
+          # 同时设置 LOCAL_DB_* 变量（export.js 使用这些变量连接数据库）
+          export LOCAL_DB_HOST="$DB_HOST"
+          export LOCAL_DB_PORT="$DB_PORT"
+          export LOCAL_DB_USER="$DB_USER"
+          export LOCAL_DB_PASSWORD="$DB_PASSWORD"
+          export LOCAL_DB_NAME="$DB_NAME"
+          
+          # 检查必要的环境变量
           if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
             echo "❌ 错误：缺少必要的数据库配置"
-            echo "请确保在GitHub Secrets中配置了以下变量："
-            echo "  - DB_HOST"
-            echo "  - DB_USER" 
-            echo "  - DB_NAME"
+            echo "请确保在 GitHub Secrets 中配置了: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME"
             exit 1
           fi
           
-          echo "🔍 环境变量检查:"
-          echo "   DB_HOST: $DB_HOST"
-          echo "   DB_USER: $DB_USER"
-          echo "   DB_PASSWORD: $DB_PASSWORD"
-          echo "   DB_NAME: $DB_NAME"
-          echo "   DB_PORT: $DB_PORT"
+          echo "🔍 数据库连接: $DB_USER@$DB_HOST:$DB_PORT/$DB_NAME"
           
-          # 根据部署类型执行不同的命令
           if [ "$DEPLOY_TYPE" = "full" ]; then
-            echo "🔄 执行完整部署..."
+            # ========================================
+            # 完整部署：仅建表（CREATE TABLE IF NOT EXISTS），不推送数据
+            # ========================================
+            echo "🔄 执行完整 Schema 部署..."
             
-            # 检查database.sql文件是否存在
-            if [ -f "database.sql" ]; then
-              echo "✅ 找到database.sql文件，执行完整部署"
+            if [ ! -f "database.sql" ]; then
+              echo "❌ 未找到 database.sql 文件"
+              exit 1
+            fi
+            
+            # 使用 process-sql.js 添加 IF NOT EXISTS
+            echo "📝 处理 SQL 文件..."
+            node src/process-sql.js database.sql database_safe.sql
+            
+            if [ $? -ne 0 ]; then
+              echo "❌ SQL 文件处理失败"
+              exit 1
+            fi
+            
+            # 执行处理后的 SQL（只有 CREATE TABLE IF NOT EXISTS，没有 INSERT）
+            mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" < database_safe.sql
+            
+            if [ $? -eq 0 ]; then
+              echo "✅ 完整 Schema 部署成功（仅表结构，不含数据）"
+            else
+              echo "❌ 完整 Schema 部署失败"
+              exit 1
+            fi
+            
+            rm -f database_safe.sql
+            
+          else
+            # ========================================
+            # 增量部署：对比 database.sql 与服务器 Schema，生成 ALTER TABLE
+            # ========================================
+            echo "🔄 执行增量 Schema 部署..."
+            
+            if [ ! -f "database.sql" ]; then
+              echo "❌ 未找到 database.sql 文件"
+              exit 1
+            fi
+            
+            # 对比本地 SQL 文件与服务器数据库字段差异
+            echo "🔍 对比本地 Schema 与服务器数据库字段差异..."
+            node src/export.js compare -f database.sql -t "$DB_NAME" -o field_updates.sql
+            
+            if [ $? -ne 0 ]; then
+              echo "❌ Schema 对比失败"
+              exit 1
+            fi
+            
+            echo "✅ Schema 对比完成"
+            
+            # 显示生成的更新脚本内容
+            echo "📋 生成的更新脚本:"
+            echo "----------------------------------------"
+            cat field_updates.sql
+            echo "----------------------------------------"
+            
+            # 检查是否有差异
+            if grep -q "没有发现字段差异" field_updates.sql; then
+              echo "✅ 没有发现 Schema 差异，无需更新"
+            else
+              echo "📝 发现 Schema 差异"
               
-              # 使用 Node.js 脚本处理 SQL 文件
-              echo "📝 处理 SQL 文件以支持已存在的表..."
-              node src/process-sql.js database.sql database_safe.sql
-              
-              if [ $? -eq 0 ]; then
-                echo "✅ SQL 文件处理成功"
-                
-                # 执行处理后的SQL文件
-                mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" < database_safe.sql
+              if [ "$AUTO_EXECUTE" = "true" ]; then
+                echo "🚀 自动执行 Schema 更新..."
+                mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" < field_updates.sql
                 
                 if [ $? -eq 0 ]; then
-                  echo "✅ 完整部署执行成功"
-                  echo "📊 已使用 IF NOT EXISTS 和 IGNORE 选项处理重复表和数据"
+                  echo "✅ Schema 增量更新成功"
                 else
-                  echo "❌ 完整部署执行失败"
+                  echo "❌ Schema 增量更新失败"
                   exit 1
                 fi
               else
-                echo "❌ SQL 文件处理失败"
-                exit 1
+                echo "📋 Schema 更新脚本已生成，跳过自动执行"
               fi
-              
-              # 清理临时文件
-              rm -f database_safe.sql
-            else
-              echo "❌ 未找到database.sql文件"
-              exit 1
             fi
             
-          else
-            echo "🔄 执行增量部署..."
-            
-            # 首先导出当前云端数据库结构到临时文件
-            echo "📤 导出云端数据库结构..."
-            node src/export.js export -o cloud_database_structure.sql -s
-            
-            if [ $? -ne 0 ]; then
-              echo "❌ 导出云端数据库结构失败"
-              exit 1
-            fi
-            
-            # 使用 compare 命令对比本地 SQL 文件与云端数据库结构
-            echo "🔍 对比本地SQL文件与云端数据库结构..."
-            
-            # 设置环境变量用于连接云端数据库
-            export LOCAL_DB_HOST="$DB_HOST"
-            export LOCAL_DB_PORT="$DB_PORT"
-            export LOCAL_DB_USER="$DB_USER"
-            export LOCAL_DB_PASSWORD="$DB_PASSWORD"
-            export LOCAL_DB_NAME="$DB_NAME"
-            
-            # 使用 compare 命令对比本地SQL文件与云端数据库字段差异
-            echo "🔍 开始对比本地SQL文件与云端数据库字段差异..."
-            node src/export.js compare -f database.sql -t "$DB_NAME" -o field_updates.sql
-            
-            if [ $? -eq 0 ]; then
-              echo "✅ 字段对比完成"
-              
-              # 检查是否生成了更新脚本
-              if [ -f "field_updates.sql" ]; then
-                # 检查是否有字段差异
-                if grep -q "没有发现字段差异" field_updates.sql; then
-                  echo "✅ 没有发现字段差异，无需更新"
-                else
-                  echo "📝 发现字段差异，生成更新脚本"
-                  
-                  # 如果设置了自动执行，则执行更新脚本
-                  if [ "$AUTO_EXECUTE" = "true" ]; then
-                    echo "🚀 自动执行字段更新..."
-                    mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" < field_updates.sql
-                    
-                    if [ $? -eq 0 ]; then
-                      echo "✅ 字段更新执行成功"
-                    else
-                      echo "❌ 字段更新执行失败"
-                      exit 1
-                    fi
-                  else
-                    echo "📋 字段更新脚本已生成，请手动执行: field_updates.sql"
-                  fi
-                fi
-              else
-                echo "❌ 未生成字段更新脚本"
-                exit 1
-              fi
-            else
-              echo "❌ 字段对比失败"
-              exit 1
-            fi
-            
-            if [ $? -ne 0 ]; then
-              echo "❌ 增量部署执行失败"
-              exit 1
-            fi
-            
-            # 清理临时文件
-            rm -f cloud_database_structure.sql field_updates.sql
+            rm -f field_updates.sql
           fi
-          
-          # 检查部署结果
-          if [ $? -ne 0 ]; then
-            echo "❌ 增量部署执行失败"
-            exit 1
-          fi
-          
-          echo "✅ 增量部署执行成功"
           
           # 验证部署结果
+          echo ""
           echo "🔍 验证部署结果..."
-          node -e "
-            const mysql = require('mysql2/promise');
-            
-            const config = {
-              host: '$DB_HOST',
-              user: '$DB_USER',
-              password: '$DB_PASSWORD',
-              database: '$DB_NAME',
-              charset: 'utf8mb4',
-              port: $DB_PORT
-            };
-            
-            mysql.createConnection(config)
-              .then(connection => {
-                return connection.execute('SHOW TABLES')
-                  .then(([rows]) => {
-                    console.log('📊 数据库表数量:', rows.length);
-                    console.log('📋 表列表:');
-                    rows.forEach(row => {
-                      console.log('  -', Object.values(row)[0]);
-                    });
-                    return connection.end();
-                  });
-              })
-              .catch(error => {
-                console.error('❌ 验证失败:', error.message);
-                process.exit(1);
-              });
-          "
+          mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASSWORD" -P "$DB_PORT" "$DB_NAME" -e "
+            SELECT TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = '$DB_NAME'
+            ORDER BY TABLE_NAME, ORDINAL_POSITION;
+          " 2>/dev/null | head -80
           
+          echo ""
           echo "🎉 部署完成！"
           echo "🌐 数据库地址: $DB_HOST:$DB_PORT"
           echo "📊 数据库名称: $DB_NAME"
-          if [ "$DEPLOY_TYPE" = "full" ]; then
-            echo "🔧 部署类型: 完整部署"
-          else
-            echo "🔧 部署类型: 增量部署（字段对比）"
-          fi
+          echo "🔧 部署类型: $DEPLOY_TYPE（仅 Schema，不含数据）"
 
     - name: 🔄 重启应用
       uses: appleboy/ssh-action@v1.0.3
@@ -330,15 +217,14 @@ jobs:
         script: |
           echo "🔄 检查是否需要重启应用..."
           
-          # 检查是否有应用需要重启
           if command -v pm2 &> /dev/null; then
             echo "🔄 重启 PM2 应用..."
             pm2 restart all || echo "PM2 重启失败或无应用运行"
           fi
           
-          if command -v docker-compose &> /dev/null || command -v docker &> /dev/null; then
+          if command -v docker &> /dev/null; then
             echo "🔄 重启 Docker 容器..."
-            docker-compose restart 2>/dev/null || docker compose restart 2>/dev/null || echo "Docker Compose 重启失败或无容器运行"
+            docker compose restart 2>/dev/null || docker-compose restart 2>/dev/null || echo "Docker 重启失败或无容器运行"
           fi
           
           echo "✅ 应用重启检查完成"
@@ -352,5 +238,5 @@ jobs:
         port: ${{ secrets.ALIYUN_PORT || '22' }}
         script: |
           echo "🧹 清理临时文件..."
-          rm -rf /tmp/*
-          echo "✅ 清理完成" 
+          rm -rf /tmp/movies-mysql-deploy
+          echo "✅ 清理完成"

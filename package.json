@@ -5,6 +5,9 @@
   "main": "src/export.js",
   "scripts": {
     "export": "node src/export.js export -d nest_db",
+    "export:schema": "node src/export.js export -d nest_db -s -o database.sql",
+    "export:full": "node src/export.js export -d nest_db -o database_full.sql",
+    "compare": "node src/export.js compare -f database.sql",
     "start": "node src/export.js export -d nest_db",
     "deploy": "node src/incremental-deploy.js",
     "deploy:execute": "node src/incremental-deploy.js --execute",

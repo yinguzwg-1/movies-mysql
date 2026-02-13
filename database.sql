@@ -1,6 +1,7 @@
--- 数据库导出
--- 创建时间: 2025-12-21T04:03:03.737Z
+-- 数据库 Schema 导出（仅表结构，不含数据）
+-- 创建时间: 2026-02-13
 -- 数据库: nest_db
+-- 说明: 此文件仅用于部署时对比表结构差异，不包含任何数据
 
 SET FOREIGN_KEY_CHECKS = 0;
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -17,25 +18,6 @@ USE `nest_db`;
 -- 数据库结构
 -- --------------------------------------------------------
 
-CREATE TABLE `photos` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `url` varchar(255) NOT NULL,
-  `title` varchar(255) DEFAULT NULL,
-  `metadata` json DEFAULT NULL,
-  `make` varchar(255) DEFAULT NULL,
-  `model` varchar(255) DEFAULT NULL,
-  `exposureTime` varchar(255) DEFAULT NULL,
-  `fNumber` varchar(255) DEFAULT NULL,
-  `iso` int(11) DEFAULT NULL,
-  `createdAt` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
-  `updatedAt` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
-  `userId` int(11) DEFAULT NULL,
-  `width` int(11) DEFAULT NULL,
-  `height` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `FK_74da4f305b050f7d27c73b04263` (`userId`),
-  CONSTRAINT `FK_74da4f305b050f7d27c73b04263` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8;
 CREATE TABLE `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `email` varchar(255) NOT NULL,
@@ -46,7 +28,30 @@ CREATE TABLE `users` (
   `updatedAt` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
   UNIQUE KEY `IDX_97672ac88f789774dd47f7c8be` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `photos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `url` varchar(255) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `metadata` json DEFAULT NULL,
+  `make` varchar(255) DEFAULT NULL,
+  `model` varchar(255) DEFAULT NULL,
+  `exposureTime` varchar(255) DEFAULT NULL,
+  `fNumber` varchar(255) DEFAULT NULL,
+  `iso` int(11) DEFAULT NULL,
+  `width` int(11) DEFAULT NULL,
+  `height` int(11) DEFAULT NULL,
+  `liveVideoUrl` varchar(255) DEFAULT NULL,
+  `takenAt` datetime DEFAULT NULL,
+  `createdAt` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updatedAt` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  `userId` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `FK_74da4f305b050f7d27c73b04263` (`userId`),
+  CONSTRAINT `FK_74da4f305b050f7d27c73b04263` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE `videos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `url` varchar(255) NOT NULL,
@@ -62,70 +67,10 @@ CREATE TABLE `videos` (
   PRIMARY KEY (`id`),
   KEY `FK_9003d36fcc646f797c42074d82b` (`userId`),
   CONSTRAINT `FK_9003d36fcc646f797c42074d82b` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 数据库数据
--- --------------------------------------------------------
-
--- 表 photos 的数据
-INSERT INTO `photos` (`id`, `url`, `title`, `metadata`, `make`, `model`, `exposureTime`, `fNumber`, `iso`, `createdAt`, `updatedAt`, `userId`, `width`, `height`) VALUES
-(5, '/uploads/file-1766281578030-449539113.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:46:18', '2025-12-21 01:46:18', 1, NULL, NULL),
-(6, '/uploads/file-1766282384171-715018586.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(7, '/uploads/file-1766282384169-464700304.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(8, '/uploads/file-1766282384177-597723287.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(9, '/uploads/file-1766282384196-97924531.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(10, '/uploads/file-1766282384195-7594250.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(11, '/uploads/file-1766282384197-115541938.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(12, '/uploads/file-1766282384228-917196623.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(13, '/uploads/file-1766282384254-346715174.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(14, '/uploads/file-1766282384272-802223146.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(15, '/uploads/file-1766282384286-452751863.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(16, '/uploads/file-1766282384302-539748812.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(17, '/uploads/file-1766282384304-943442706.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(18, '/uploads/file-1766282384315-278565435.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 01:59:44', '2025-12-21 01:59:44', 1, NULL, NULL),
-(19, '/uploads/file-1766282406242-193967882.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(20, '/uploads/file-1766282406245-558758494.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(21, '/uploads/file-1766282406258-408062437.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(22, '/uploads/file-1766282406257-518885757.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(23, '/uploads/file-1766282406255-244275272.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(24, '/uploads/file-1766282406259-201571688.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(25, '/uploads/file-1766282406276-471289413.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(26, '/uploads/file-1766282406282-389879961.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(27, '/uploads/file-1766282406309-122834070.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(28, '/uploads/file-1766282406306-627588598.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(29, '/uploads/file-1766282406312-639228000.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(30, '/uploads/file-1766282406318-90236625.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(31, '/uploads/file-1766282406331-572921175.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(32, '/uploads/file-1766282406336-217057430.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(33, '/uploads/file-1766282406358-721508159.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(34, '/uploads/file-1766282406362-164334970.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:06', '2025-12-21 02:00:06', 1, NULL, NULL),
-(35, '/uploads/file-1766282418376-49367501.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(36, '/uploads/file-1766282418377-990847928.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(37, '/uploads/file-1766282418389-432112887.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(38, '/uploads/file-1766282418390-816605599.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(39, '/uploads/file-1766282418391-53641760.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(40, '/uploads/file-1766282418393-159372205.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(41, '/uploads/file-1766282418409-118599985.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(42, '/uploads/file-1766282418409-942039231.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(43, '/uploads/file-1766282418432-133349514.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(44, '/uploads/file-1766282418441-895510179.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(45, '/uploads/file-1766282418451-637339400.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(46, '/uploads/file-1766282418454-43546951.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(47, '/uploads/file-1766282418468-788805054.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(48, '/uploads/file-1766282418469-701323681.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(49, '/uploads/file-1766282418473-677676539.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(50, '/uploads/file-1766282418479-334354674.jpg', NULL, '{}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:00:18', '2025-12-21 02:00:18', 1, NULL, NULL),
-(51, '/uploads/file-1766285693272-279082066.jpg', NULL, '{"Orientation":6}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:54:53', '2025-12-21 02:54:53', 1, 4032, 3024),
-(52, '/uploads/file-1766285961327-406637505.webp', NULL, '{"Orientation":6}', NULL, NULL, NULL, NULL, NULL, '2025-12-21 02:59:23', '2025-12-21 02:59:23', 1, 4032, 3024);
-
--- 表 users 的数据
-INSERT INTO `users` (`id`, `email`, `password`, `name`, `avatar`, `createdAt`, `updatedAt`) VALUES
-(1, '976108364@qq.com', 'yinguzwg', '银古', 'https://avatars.githubusercontent.com/u/1?v=4', '2025-12-20 10:31:10', '2025-12-20 10:55:53');
-
--- 表 videos 的数据
-INSERT INTO `videos` (`id`, `url`, `coverUrl`, `title`, `metadata`, `duration`, `width`, `height`, `createdAt`, `updatedAt`, `userId`) VALUES
-(1, '/uploads/file-1766288598297-880403209.mp4', NULL, '9f57039ba7f617d77d3d34312dbfe113.mp4', NULL, NULL, NULL, NULL, '2025-12-21 03:43:37', '2025-12-21 03:43:37', 1);
-
+-- 仅导出表结构，不包含数据
+-- 数据由应用运行时产生，不通过 SQL 部署
 
 COMMIT;
 SET FOREIGN_KEY_CHECKS = 1;
