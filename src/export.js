@@ -144,13 +144,13 @@ async function getDatabaseStructure(connection) {
   const structure = [];
   
   // 获取所有表
-  const [tables] = await connection.execute('SHOW TABLES');
+  const [tables] = await connection.query('SHOW TABLES');
   
   for (const table of tables) {
     const tableName = Object.values(table)[0];
     
     // 获取建表语句
-    const [createTable] = await connection.execute(`SHOW CREATE TABLE \`${tableName}\``);
+    const [createTable] = await connection.query(`SHOW CREATE TABLE \`${tableName}\``);
     const createTableSql = createTable[0]['Create Table'] + ';';
     structure.push(createTableSql);
     
@@ -167,7 +167,7 @@ async function getDatabaseStructure(connection) {
     }
     
     // 获取索引信息，避免重复
-    const [indexes] = await connection.execute(`SHOW INDEX FROM \`${tableName}\``);
+    const [indexes] = await connection.query(`SHOW INDEX FROM \`${tableName}\``);
     const processedIndexes = new Set(); // 用于跟踪已处理的索引
     
     for (const index of indexes) {
@@ -200,17 +200,17 @@ async function getDatabaseData(connection) {
   const data = [];
   
   // 获取所有表
-  const [tables] = await connection.execute('SHOW TABLES');
+  const [tables] = await connection.query('SHOW TABLES');
   
   for (const table of tables) {
     const tableName = Object.values(table)[0];
     
     // 获取表数据
-    const [rows] = await connection.execute(`SELECT * FROM \`${tableName}\``);
+    const [rows] = await connection.query(`SELECT * FROM \`${tableName}\``);
     
     if (rows.length > 0) {
       // 获取列名和列类型
-      const [columns] = await connection.execute(`DESCRIBE \`${tableName}\``);
+      const [columns] = await connection.query(`DESCRIBE \`${tableName}\``);
       const columnNames = columns.map(col => col.Field);
       const columnTypes = columns.map(col => col.Type);
       
@@ -362,7 +362,7 @@ async function compareSqlFileWithDatabase(sqlFile, targetDb, outputFile) {
     
     // 获取目标数据库结构
     spinner.text = '正在获取目标数据库表结构...';
-    await connection.execute(`USE \`${targetDb}\``);
+    await connection.query(`USE \`${targetDb}\``);
     const targetStructure = await getDatabaseStructure(connection);
     
     // 关闭连接
@@ -464,12 +464,12 @@ async function compareDatabases(sourceDb, targetDb, outputFile) {
     
     // 获取源数据库结构
     spinner.text = '正在获取源数据库表结构...';
-    await connection.execute(`USE \`${sourceDb}\``);
+    await connection.query(`USE \`${sourceDb}\``);
     const sourceStructure = await getDatabaseStructure(connection);
     
     // 获取目标数据库结构
     spinner.text = '正在获取目标数据库表结构...';
-    await connection.execute(`USE \`${targetDb}\``);
+    await connection.query(`USE \`${targetDb}\``);
     const targetStructure = await getDatabaseStructure(connection);
     
     // 关闭连接
